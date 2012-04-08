@@ -417,7 +417,8 @@ def util_get_image_info(image_set, id_in_set):
 
 def util_download_danbooru_image(image_set, id_in_set, image_url, image_size = 0, image_md5 = None):
     images_root = g_image_root
-    image_url = "http://" + urllib2.quote(image_url[7:])
+    idx = image_url.index(":")
+    image_url = "http://" + urllib2.quote(image_url[idx + 3:])
     image_ext = image_url[image_url.rfind("."):]
     dest_image = images_root + os.path.sep + image_set + os.path.sep + util_get_bucket_name(id_in_set) + os.path.sep + str(id_in_set) + image_ext
     if os.path.exists(dest_image):
@@ -429,7 +430,7 @@ def util_download_danbooru_image(image_set, id_in_set, image_url, image_size = 0
     util_make_dirs(tmp_folder + os.path.sep + image_set)
     try:
         download_fpath = tmp_folder + os.path.sep + image_set + os.path.sep + str(id_in_set) + image_ext
-        print "[download] '%s %d'" % (image_set, id_in_set)
+        print "[download] '%s %d' (url=%s)" % (image_set, id_in_set, image_url)
         image_data = urllib2.urlopen(image_url).read()
         download_file = open(download_fpath, "wb")
         download_file.write(image_data)
@@ -518,14 +519,14 @@ def util_mirror_danbooru_site_html(site_url):
     elif site_url.find("konachan") != -1:
         image_set_base = "konachan"
         image_set_highres = "konachan_highres"
-    elif site_url.find("imouto") != -1:
+    elif site_url.find("yande") != -1:
         image_set_base = "moe_imouto"
         image_set_highres = "moe_imouto_highres"
     elif site_url.find("nekobooru") != -1:
         image_set_base = "nekobooru"
         image_set_highres = "nekobooru_highres"
     else:
-        print "site '%s' not supported yet!"
+        print "site '%s' not supported yet!" % site_url
         return
 
     # Start mirroring from page 1.
@@ -617,14 +618,14 @@ def util_mirror_danbooru_site(site_url):
     elif site_url.find("konachan") != -1:
         image_set_base = "konachan"
         image_set_highres = "konachan_highres"
-    elif site_url.find("imouto") != -1:
+    elif site_url.find("yande.re") != -1:
         image_set_base = "moe_imouto"
         image_set_highres = "moe_imouto_highres"
     elif site_url.find("nekobooru") != -1:
         image_set_base = "nekobooru"
         image_set_highres = "nekobooru_highres"
     else:
-        print "site '%s' not supported yet!"
+        print "site '%s' not supported yet!" % site_url
         return
 
     # Start mirroring from page 1.
@@ -701,14 +702,14 @@ def util_mirror_danbooru_site_ex(site_url, before_id = None):
     elif site_url.find("konachan") != -1:
         image_set_base = "konachan"
         image_set_highres = "konachan_highres"
-    elif site_url.find("imouto") != -1:
+    elif site_url.find("yande.re") != -1:
         image_set_base = "moe_imouto"
         image_set_highres = "moe_imouto_highres"
     elif site_url.find("nekobooru") != -1:
         image_set_base = "nekobooru"
         image_set_highres = "nekobooru_highres"
     else:
-        print "site '%s' not supported yet!"
+        print "site '%s' not supported yet!" % site_url
         return
 
     tmp_folder = g_tmp_folder
@@ -1103,10 +1104,10 @@ def moe_mirror_konachan():
     util_mirror_danbooru_site("http://konachan.com")
 
 def moe_mirror_moe_imouto():
-    util_mirror_danbooru_site("http://moe.imouto.org")
+    util_mirror_danbooru_site("http://yande.re")
 
 def moe_mirror_moe_imouto_html():
-    util_mirror_danbooru_site_html("http://moe.imouto.org")
+    util_mirror_danbooru_site_html("http://yande.re")
 
 def moe_mirror_konachan_html():
     util_mirror_danbooru_site_html("http://konachan.com")
@@ -2654,7 +2655,7 @@ def util_check_dropbox_images_id(fpath, set_name, id_in_set):
     fsize = os.stat(fpath).st_size
     print "checking %s %d, fsize=%s (%d)" % (set_name, id_in_set, pretty_fsize(fsize), fsize)
     if set_name.startswith("moe_imouto"):
-        post_url = "http://moe.imouto.org/post/show/%d" % id_in_set
+        post_url = "http://yande.re/post/show/%d" % id_in_set
     elif set_name.startswith("danbooru"):
         post_url = "http://danbooru.donmai.us/post/show/%d" % id_in_set
     elif set_name.startswith("konachan"):
@@ -2765,7 +2766,7 @@ available commands:"
     export-sql                      export images based on sql query result
     fetch-tag-history-danbooru      fetch tag history from danbooru.donmai.us
     fetch-tag-history-konachan      fetch tag history from konachan.com
-    fetch-tag-history-moe-imouto    fetch tag history from moe.imouto.org
+    fetch-tag-history-moe-imouto    fetch tag history from moe.imouto.org (now yande.re)
     fetch-tag-history-nekobooru     fetch tag history from nekobooru.net
     find-ophan                      find images that are in images root, but not in database
     help                            display this info
@@ -2783,7 +2784,7 @@ available commands:"
     mirror-danbooru-1000            mirror danbooru.donmai.us from 1000th page
     mirror-danbooru-before          mirror danbooru.donmai.us before a certain picture id
     mirror-konachan                 mirror konachan.com
-    mirror-moe-imouto               mirror moe.imouto.org
+    mirror-moe-imouto               mirror moe.imouto.org (now yande.re)
     mirror-moe-imouto-html          mirror moe.imouto.org (through html request)
     mirror-nekobooru                mirror nekobooru.net
     mirror-tu178                    mirror tu.178.com
@@ -2791,11 +2792,11 @@ available commands:"
     update-file-size                (depreated) make sure every images's file_size is read into databse
     update-pool-danbooru            update pool info from danbooru.donmai.us
     update-pool-konachan            update pool info from konachan.com
-    update-pool-moe-imouto          update pool info from moe.imouto.org
+    update-pool-moe-imouto          update pool info from moe.imouto.org (now yande.re)
     update-pool-nekobooru           update pool info from nekobooru.net
     update-tag-history-danbooru     update tag history from danbooru.donmai.us
     update-tag-history-konachan     update tag history from konachan.com
-    update-tag-history-moe-imouto   update tag history from moe.imouto.org
+    update-tag-history-moe-imouto   update tag history from moe.imouto.org (now yande.re)
     update-tag-history-nekobooru    update tag history from nekobooru.net
 
 author: Santa Zhang (santa1987@gmail.com)"""
