@@ -18,6 +18,7 @@ import shutil
 import traceback
 import sqlite3
 import csv
+import plistlib
 from subprocess import Popen, PIPE, STDOUT
 from urllib2 import *
 from utils import *
@@ -1434,6 +1435,48 @@ def hk_tunet_status():
     os.system("curl -s -b PHPSESSID=%s -d 'action=logout' -k 'https://usereg.tsinghua.edu.cn/do.php' -o /dev/null" % sess_id)
 
 
+def hk_check_contacts():
+    vcf_dir = "/Users/santa/Dropbox/Contacts"
+    vcf_list = []
+    for fn in os.listdir(vcf_dir):
+        if fn.endswith(".vcf"):
+            name = fn[:-4].decode("utf-8")
+            print ".vcf:", name
+            vcf_list += name,
+    ab_list = []
+    ab_root_dir = "/Users/santa/Library/Application Support/AddressBook/Sources"
+    ab_dir = None
+    for fn in os.listdir(ab_root_dir):
+        if len(fn) == 36:
+            ab_dir = os.path.join(ab_root_dir, fn, "Metadata")
+    if ab_dir == None:
+        print "Cannot find AddressBook contacts!"
+        exit(1)
+    for fn in os.listdir(ab_dir):
+        if fn.endswith(".abcdp") == False:
+            continue
+        fpath = os.path.join(ab_dir, fn)
+        tmp_fn = "/tmp/housekeeper-contact.abcdp"
+        os.system("cp '%s' '%s'" % (fpath, tmp_fn))
+        os.system("plutil -convert xml1 '%s'" % tmp_fn)
+        pl = plistlib.readPlist(tmp_fn)
+        if "First" in pl.keys() and "Last" in pl.keys():
+            name = (pl["First"] + " " + pl["Last"]).strip()
+        elif "First" in pl.keys():
+            name = pl["First"]
+        elif "Last" in pl.keys():
+            name = pl["Last"]
+        if name in ab_list:
+            print "AddressBook dup:", name
+        ab_list += name,
+        os.remove(tmp_fn)
+    for n in vcf_list:
+        if n not in ab_list:
+            print "Only in .vcf:", n
+    for n in ab_list:
+        if n not in vcf_list:
+            print "Only in AddressBook:", n
+
 def hk_help():
     print """housekeeper.py: helper script to manage my important collections
 usage: housekeeper.py <command>
@@ -1445,6 +1488,7 @@ available commands:
     backup-psp                         backup my psp
     batch-rename                       batch rename files under a folder
     check-ascii-fnames                 make sure all file has ascii-only name
+    check-contacts                     check for contacts folder (mac only)
     check-crc32                        check file integrity by crc32
     clean-eject-usb <name>             cleanly eject usb drives (cleans .Trash, .SpotLight folders)
     gem-cleanup                        cleanup gem files
@@ -1496,6 +1540,8 @@ if __name__ == "__main__":
         hk_backup_psp()
     elif sys.argv[1] == "batch-rename":
         hk_batch_rename()
+    elif sys.argv[1] == "check-contacts":
+        hk_check_contacts()
     elif sys.argv[1] == "check-crc32":
         hk_check_crc32()
     elif sys.argv[1] == "check-ascii-fnames":
