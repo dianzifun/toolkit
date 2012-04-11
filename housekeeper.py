@@ -10,6 +10,7 @@ from __future__ import with_statement
 from contextlib import closing
 import urllib
 import sys
+import hashlib
 import os
 import re
 import time
@@ -1477,6 +1478,19 @@ def hk_check_contacts():
         if n not in vcf_list:
             print "Only in AddressBook:", n
 
+def hk_nds_ls(nds_game_dir):
+    for fn in os.listdir(nds_game_dir):
+        if not fn.lower().endswith(".nds"):
+            continue
+        fpath = os.path.join(nds_game_dir, fn)
+        f = open(fpath, "rb")
+        game_id = f.read(12).strip()
+        m = hashlib.md5()
+        m.update(f.read(1024 * 1024))
+        game_finger = m.hexdigest()
+        f.close()
+        print "%s id='%s' fn='%s'" % (game_finger, game_id, fn)
+
 def hk_help():
     print """housekeeper.py: helper script to manage my important collections
 usage: housekeeper.py <command>
@@ -1504,6 +1518,7 @@ available commands:
     itunes-stats                       display iTunes library info
     jpeg2jpg                           convert .jpeg ext name to .jpg
     lowercase-ext                      make sure file extensions are lower case
+    nds-ls                             list NDS games info
     psp-sync-pic                       sync images to psp
     papers-find-ophan                  check if pdf is in papers folder but not in Papers library
     rm-all-gems                        remove all rubygems (currently Mac only)
@@ -1575,6 +1590,11 @@ if __name__ == "__main__":
         hk_jpeg2jpg()
     elif sys.argv[1] == "lowercase-ext":
         hk_lowercase_ext()
+    elif sys.argv[1] == "nds-ls":
+        if len(sys.argv) < 3:
+            print "usage: housekeeper.py nds-ls <nds-game-dir>"
+            exit(0)
+        hk_nds_ls(sys.argv[2])
     elif sys.argv[1] == "psp-sync-pic":
         hk_psp_sync_pic()
     elif sys.argv[1] == "papers-find-ophan":
