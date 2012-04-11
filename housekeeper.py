@@ -833,11 +833,37 @@ def get_du_of_folder(folder):
                 du += os.stat(fpath).st_size
     return du
 
+def hk_backup_nds():
+    tmp_folder = get_config("tmp_folder")
+    nds_root = get_config("nds_root")
+    bkup_folder = os.path.join(get_config("dropbox_folder"), "Backups")
+    bkup_job_name = "nds_backup.%s" % (time.strftime("%y%m%d-%H%M%S", time.localtime()))
+    tmp_cp_folder = os.path.join(tmp_folder, bkup_job_name)
+    hk_make_dirs(os.path.join(tmp_cp_folder, "GAMES"))
+    hk_make_dirs(os.path.join(tmp_cp_folder, "NDSGBA"))
+    hk_make_dirs(os.path.join(tmp_cp_folder, "NDSSFC"))
+
+    hk_exec("cp -v %s/*.sav '%s'" % (os.path.join(nds_root, "GAMES"), os.path.join(tmp_cp_folder, "GAMES")))
+    hk_exec("cp -v %s/*.SAV '%s'" % (os.path.join(nds_root, "GAMES"), os.path.join(tmp_cp_folder, "GAMES")))
+    hk_exec("cp -v %s/*.rtf* '%s'" % (os.path.join(nds_root, "GAMES"), os.path.join(tmp_cp_folder, "GAMES")))
+    hk_exec("cp -v %s/*.RTF* '%s'" % (os.path.join(nds_root, "GAMES"), os.path.join(tmp_cp_folder, "GAMES")))
+
+    hk_exec("cp -rv '%s' '%s'" % (os.path.join(nds_root, "NDSGBA", "gamerts"), os.path.join(tmp_cp_folder, "NDSGBA")))
+    hk_exec("cp -rv '%s' '%s'" % (os.path.join(nds_root, "NDSSFC", "gamerts"), os.path.join(tmp_cp_folder, "NDSSFC")))
+
+    print "zipping...."
+    zipdir(tmp_cp_folder, tmp_cp_folder + ".zip")
+    print "[rmdir] %s" % tmp_cp_folder
+    shutil.rmtree(tmp_cp_folder)
+    shutil.move(tmp_cp_folder + ".zip", bkup_folder)
+    print "done!"
+
+
 def hk_backup_psp():
     tmp_folder = get_config("tmp_folder")
     psp_root = get_config("psp_root")
     bkup_folder = os.path.join(get_config("dropbox_folder"), "Backups")
-    bkup_job_name = "psp_backup.%s" % (time.strftime("%y%m%d-%H%M%S", time.localtime()))
+    bkup_job_name = "nds_backup.%s" % (time.strftime("%y%m%d-%H%M%S", time.localtime()))
     tmp_cp_folder = os.path.join(tmp_folder, bkup_job_name)
     hk_make_dirs(tmp_cp_folder)
     tmp_savedata_dir = os.path.join(tmp_cp_folder, "PSP", "SAVEDATA")
@@ -1500,6 +1526,7 @@ available commands:
     backup-conf                        backup my config files
     backup-evernote                    bakcup evernote documents
     backup-psp                         backup my psp
+    backup-nds                         backup my nds
     batch-rename                       batch rename files under a folder
     check-ascii-fnames                 make sure all file has ascii-only name
     check-contacts                     check for contacts folder (mac only)
@@ -1553,6 +1580,8 @@ if __name__ == "__main__":
         hk_backup_evernote()
     elif sys.argv[1] == "backup-psp":
         hk_backup_psp()
+    elif sys.argv[1] == "backup-nds":
+        hk_backup_nds()
     elif sys.argv[1] == "batch-rename":
         hk_batch_rename()
     elif sys.argv[1] == "check-contacts":
