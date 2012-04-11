@@ -840,16 +840,16 @@ def hk_backup_nds():
     bkup_job_name = "nds_backup.%s" % (time.strftime("%y%m%d-%H%M%S", time.localtime()))
     tmp_cp_folder = os.path.join(tmp_folder, bkup_job_name)
     hk_make_dirs(os.path.join(tmp_cp_folder, "GAMES"))
-    hk_make_dirs(os.path.join(tmp_cp_folder, "NDSGBA"))
-    hk_make_dirs(os.path.join(tmp_cp_folder, "NDSSFC"))
+    hk_make_dirs(os.path.join(tmp_cp_folder, "NDSGBA", "gamerts"))
+    hk_make_dirs(os.path.join(tmp_cp_folder, "NDSSFC", "gamerts"))
 
     hk_exec("cp -v %s/*.sav '%s'" % (os.path.join(nds_root, "GAMES"), os.path.join(tmp_cp_folder, "GAMES")))
     hk_exec("cp -v %s/*.SAV '%s'" % (os.path.join(nds_root, "GAMES"), os.path.join(tmp_cp_folder, "GAMES")))
-    hk_exec("cp -v %s/*.rtf* '%s'" % (os.path.join(nds_root, "GAMES"), os.path.join(tmp_cp_folder, "GAMES")))
-    hk_exec("cp -v %s/*.RTF* '%s'" % (os.path.join(nds_root, "GAMES"), os.path.join(tmp_cp_folder, "GAMES")))
+#    hk_exec("cp -v %s/*.rtf* '%s'" % (os.path.join(nds_root, "GAMES"), os.path.join(tmp_cp_folder, "GAMES")))
+#    hk_exec("cp -v %s/*.RTF* '%s'" % (os.path.join(nds_root, "GAMES"), os.path.join(tmp_cp_folder, "GAMES")))
 
-    hk_exec("cp -rv '%s' '%s'" % (os.path.join(nds_root, "NDSGBA", "gamerts"), os.path.join(tmp_cp_folder, "NDSGBA")))
-    hk_exec("cp -rv '%s' '%s'" % (os.path.join(nds_root, "NDSSFC", "gamerts"), os.path.join(tmp_cp_folder, "NDSSFC")))
+    hk_exec("cp -v %s/*.sav '%s'" % (os.path.join(nds_root, "NDSGBA", "gamerts"), os.path.join(tmp_cp_folder, "NDSGBA", "gamerts")))
+    hk_exec("cp -v %s/*.SAV '%s'" % (os.path.join(nds_root, "NDSSFC", "gamerts"), os.path.join(tmp_cp_folder, "NDSSFC", "gamerts")))
 
     print "zipping...."
     zipdir(tmp_cp_folder, tmp_cp_folder + ".zip")
