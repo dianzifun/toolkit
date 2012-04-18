@@ -201,7 +201,7 @@ def mang_download_manhua178(manga_url, **opt):
             idx = chap_src.find("var pages")
             if idx < 0:
                 print chap_src
-                raise "'var pages' not found!"
+                raise Exception("'var pages' not found!")
             idx += 13
             idx2 = chap_src.find("\r\n", idx) - 2
             comic_pages_src = chap_src[idx:idx2].replace("\\/", "/")
