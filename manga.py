@@ -12,6 +12,8 @@ import time
 import traceback
 import shutil
 import socket
+import zlib
+import gzip
 import urllib2
 from urllib2 import HTTPError
 from utils import *
@@ -200,7 +202,17 @@ def mang_download_manhua178(manga_url, **opt):
             chap_src = urllib2.urlopen(chap_url).read()
             idx = chap_src.find("var pages")
             if idx < 0:
-                print chap_src
+                # first fall back, gzipped content
+                gz_f = open("/tmp/manga.py.tmp.gz", "wb")
+                gz_f.write(chap_src)
+                gz_f.close()
+                gz_f = gzip.open("/tmp/manga.py.tmp.gz", "r")
+                chap_src = gz_f.read()
+                gz_f.close()
+                os.remove("/tmp/manga.py.tmp.gz")
+            idx = chap_src.find("var pages")
+            if idx < 0:
+                # second fall back
                 raise Exception("'var pages' not found!")
             idx += 13
             idx2 = chap_src.find("\r\n", idx) - 2
