@@ -243,36 +243,45 @@ def mang_download_manhua178(manga_url, **opt):
 
             chapter_download_ok = True # whether the chapter is successfully downloaded
             for pg in comic_pages_url:
-                full_pg = (base_url + "/imgs/" + pg)
-                idx = full_pg.rfind("/") + 1
-                leaf_nm = full_pg[idx:]
-                print leaf_nm
-                fn = comic_folder_path + u"/" + chap_title + u"/" + leaf_nm.decode("unicode_escape")
-                mang_message(fn)
-                down_filename = fn
-                if os.path.exists(down_filename):
-                    mang_message("[pass] %s" % down_filename)
-                    continue
-                down_f = None
-                full_pg_unescaped = full_pg.decode("unicode_escape").encode("utf-8")
-                full_pg_unescaped = full_pg_unescaped.replace(" ", "%20")
                 try:
-                    down_data = urllib2.urlopen(full_pg_unescaped).read()
-                    down_f = open(fn + u".tmp", "wb")
-                    down_f.write(down_data)
-                    down_f.close()
-                    shutil.move(fn + u".tmp", fn)
-                except HTTPError, e:
-                    print "download failure!"
-                    if down_f != None:
+                    full_pg = (base_url + "/imgs/" + pg)
+                    idx = full_pg.rfind("/") + 1
+                    leaf_nm = full_pg[idx:]
+                    print leaf_nm
+                    fn = comic_folder_path + u"/" + chap_title + u"/" + leaf_nm.decode("unicode_escape")
+                    mang_message(fn)
+                    down_filename = fn
+                    if os.path.exists(down_filename):
+                        mang_message("[pass] %s" % down_filename)
+                        continue
+                    down_f = None
+                    full_pg_unescaped = full_pg.decode("unicode_escape").encode("utf-8")
+                    full_pg_unescaped = full_pg_unescaped.replace(" ", "%20")
+                    try:
+                        down_data = urllib2.urlopen(full_pg_unescaped).read()
+                        down_f = open(fn + u".tmp", "wb")
+                        down_f.write(down_data)
                         down_f.close()
-                    if os.path.exists(fn + u".tmp"):
-                        os.remove(fn + u".tmp")
+                        shutil.move(fn + u".tmp", fn)
+                    except HTTPError, e:
+                        print "download failure!"
+                        if down_f != None:
+                            down_f.close()
+                        if os.path.exists(fn + u".tmp"):
+                            os.remove(fn + u".tmp")
+                        err_log_f = open(error_log_fn, "a")
+                        try:
+                            err_log_f.write("failed to download: %s\n" % fn)
+                        except:
+                            err_log_f.write("failed to download from: %s\n" % full_pg_unescaped)
+                        finally:
+                            err_log_f.close()
+                        chapter_download_ok = False
+                except:
+                    backtrace.print_exc()
                     err_log_f = open(error_log_fn, "a")
                     try:
-                        err_log_f.write("failed to download: %s\n" % fn)
-                    except:
-                        err_log_f.write("failed to download from: %s\n" % full_pg_unescaped)
+                        err_log_f.write("failed to download: %s\n" % pg)
                     finally:
                         err_log_f.close()
                     chapter_download_ok = False
