@@ -119,11 +119,32 @@ def mang_pack_all():
         if os.path.isdir(fpath):
             mang_ensure_manga_packed(fpath)
 
+def gunzip_content(data):
+    try:
+        gz_f = open("/tmp/manga.py.tmp.gz", "wb")
+        gz_f.write(data)
+        gz_f.close()
+        gz_f = gzip.open("/tmp/manga.py.tmp.gz", "r")
+        orig_data = gz_f.read()
+        gz_f.close()
+    finally:
+        os.remove("/tmp/manga.py.tmp.gz")
+    return orig_data
+
 def mang_download_manhua178(manga_url, **opt):
     print "[toc] %s" % manga_url
     root_page = manga_url
     page_src = urllib2.urlopen(root_page).read()
-    idx = page_src.index("var g_comic_name = \"") + 20
+    idx = page_src.find("var g_comic_name = \"")
+    if idx < 0:
+        # fall back to gzip
+        page_src = gunzip_content(page_src)
+        idx = page_src.find("var g_comic_name = \"")
+        if idx < 0:
+            # failure again!
+            raise "failed to locate comic name ('g_comic_name')!"
+    idx += 20
+
     idx2 = page_src.index("\r\n", idx) - 2
     comic_name = page_src[idx:idx2].replace(" ", "").decode("utf-8")
     comic_name = comic_name.strip()
@@ -203,13 +224,7 @@ def mang_download_manhua178(manga_url, **opt):
             idx = chap_src.find("var pages")
             if idx < 0:
                 # first fall back, gzipped content
-                gz_f = open("/tmp/manga.py.tmp.gz", "wb")
-                gz_f.write(chap_src)
-                gz_f.close()
-                gz_f = gzip.open("/tmp/manga.py.tmp.gz", "r")
-                chap_src = gz_f.read()
-                gz_f.close()
-                os.remove("/tmp/manga.py.tmp.gz")
+                chap_src = gunzip_content(chap_src)
             idx = chap_src.find("var pages")
             if idx < 0:
                 # second fall back
