@@ -14,6 +14,7 @@ import shutil
 import socket
 import zlib
 import gzip
+import zipfile
 import urllib2
 from urllib2 import HTTPError
 from utils import *
@@ -49,6 +50,7 @@ usage: manga.py <command>
 available commands:
 
     check-corrupt        check for corrupt zip files and images
+    check-cruft          find useless .DS_Store, Thumb.db files
     download             download a manga book
     download-reverse     download a manga book, in reverse order
     help                 display this help message
@@ -61,6 +63,27 @@ available commands:
 author: Santa Zhang (santa1987@gmail.com)"""
 
 
+def mg_check_cruft():
+    scan_counter = 0
+    for root, dirnames, fnames in os.walk(MANGA_FOLDER):
+        for fn in fnames:
+            fpath = os.path.join(root, fn)
+            if not fpath.lower().endswith(".zip"):
+                continue
+            zf = ZipFile(fpath)
+            has_cruft = False
+            for zinfo in zf.infolist():
+                test_str = zinfo.filename.lower()
+                if test_str.endswith(".ds_store") or test_str.endswith("thumbs.db"):
+                    has_cruft = True
+                    break
+            if has_cruft:
+                write_log("[warning] has cruft file: '%s'" % fpath)
+            scan_counter += 1
+            if scan_counter % 100 == 0:
+                print "%d manga archives checked\r" % scan_counter
+    if scan_counter % 100 != 0:
+        print "%d manga archives checked\r" % scan_counter
 
 def mang_is_image(fname):
     return is_image(fname)
@@ -693,7 +716,6 @@ def mang_list_library():
 
 
 def util_check_corrupt_zip():
-    import zipfile
     tmp_folder = get_config("tmp_folder")
     print "tmp folder:", tmp_folder
     bad_list = []
@@ -702,10 +724,11 @@ def util_check_corrupt_zip():
             fpath = os.path.join(root, fn)
             if fpath.lower().endswith(".zip"):
                 print "checking zip file:", fpath
-                the_zip_file = zipfile.ZipFile(fpath)
+                the_zip_file = ZipFile(fpath)
                 ret = the_zip_file.testzip()
                 if ret is not None:
                     print "*** first bad file in zip: %s" % ret
+                    write_log("[corrupt] bad file '%s' in zip archive '%s'" % (ret, fpath))
                     bad_list += (fpath, ret),
                 the_zip_file.close()
 
@@ -714,7 +737,7 @@ def util_check_corrupt_zip():
     else:
         print "*** corruption found:"
         for bad in bad_list:
-            print bad
+            print "%s, %s" % (bad[0], bad[1])
 
 
 # used in util_check_corrupt_images_in_zip, wrap binary as a file object for PIL
@@ -751,10 +774,9 @@ class FileObjForPIL(object):
 
 
 def util_check_corrupt_images_in_zip(fpath):
-    import zipfile
     from PIL import Image
     print "checking images in zip file:", fpath
-    zf = zipfile.ZipFile(fpath)
+    zf = ZipFile(fpath)
     for zinfo in zf.infolist():
         if is_image(zinfo.filename.lower()):
             zobj = zf.open(zinfo.filename, "r")
@@ -802,6 +824,8 @@ if __name__ == "__main__":
         mang_print_help()
     elif sys.argv[1] == "check-corrupt":
         mang_check_corrupt()
+    elif sys.argv[1] == "check-cruft":
+        mg_check_cruft()
     elif sys.argv[1] == "download":
         mang_download()
     elif sys.argv[1] == "download-reverse":
