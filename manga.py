@@ -52,7 +52,7 @@ available commands:
     check-corrupt        check for corrupt zip files and images
     check-cruft          find useless .DS_Store, Thumb.db files
     check-missing        find possible missing files
-    check-origin         check origin manga server to check if manga archives are healthy
+    check-origin [dir]   check origin manga server to check if manga archives are healthy
     download             download a manga book
     download-reverse     download a manga book, in reverse order
     help                 display this help message
@@ -1073,16 +1073,21 @@ def getheadersonly(url, redirections=True):
 
 
 def mg_check_origin():
-    for ent in os.listdir(MANGA_FOLDER):
-        dpath = os.path.join(MANGA_FOLDER, ent)
-        if not os.path.isdir(dpath):
-            continue
+    if len(sys.argv) > 2:
+        dpath = sys.argv[2]
         if "acg178" in dpath:
-            try:
-                mg_check_178(dpath)
-            except:
-                traceback.print_exc()
-                time.sleep(1)
+            mg_check_178(dpath)
+    else:
+        for ent in os.listdir(MANGA_FOLDER):
+            dpath = os.path.join(MANGA_FOLDER, ent)
+            if not os.path.isdir(dpath):
+                continue
+            if "acg178" in dpath:
+                try:
+                    mg_check_178(dpath)
+                except:
+                    traceback.print_exc()
+                    time.sleep(1)
 
 
 def mang_serve():

@@ -278,7 +278,9 @@ def write_log(text):
     f = open(log_fn, "a")
     tm = time.strftime("%Y.%m.%d %H:%M:%S", time.localtime())
     try:
-        f.write("[%s] %s\n" % (tm, text))
+        f.write("[%s] " % tm)
+        f.write(text.encode("utf-8"))
+        f.write("\n")
     except:
         traceback.print_exc()
     f.close()
