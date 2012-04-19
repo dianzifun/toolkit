@@ -51,6 +51,7 @@ available commands:
 
     check-corrupt        check for corrupt zip files and images
     check-cruft          find useless .DS_Store, Thumb.db files
+    check-missing        find possible missing files
     download             download a manga book
     download-reverse     download a manga book, in reverse order
     help                 display this help message
@@ -79,6 +80,76 @@ def mg_check_cruft():
                     break
             if has_cruft:
                 write_log("[warning] has cruft file: '%s'" % fpath)
+            scan_counter += 1
+            if scan_counter % 100 == 0:
+                print "%d manga archives checked\r" % scan_counter
+    if scan_counter % 100 != 0:
+        print "%d manga archives checked\r" % scan_counter
+
+
+def extract_numbers(str):
+    nums = []
+    s = ""
+    for c in str:
+        if c.isdigit():
+            s += c
+        elif s != "":
+            nums += int(s),
+            s = ""
+    if s != "":
+        nums += s,
+    return nums
+
+
+def remove_continuous_pages(pages):
+    if len(pages) < 5:
+        return pages
+    idx = 0
+    idx2 = 1
+    while idx2 < len(pages):
+        if pages[idx2] == pages[idx2 - 1] + 1:
+            pass
+        else:
+            if idx2 - idx >= 5:
+                # do crop
+                pages = pages[:idx] + pages[idx2 + 1:]
+            idx = idx2
+        idx2 += 1
+    if idx2 - idx >= 5:
+        pages = pages[:idx] + pages[idx2 + 1:]
+    return pages
+
+
+def mg_check_missing():
+    # very inaccurate algorithm
+    scan_counter = 0
+    for root, dirnames, fnames in os.walk(MANGA_FOLDER):
+        for fn in fnames:
+            fpath = os.path.join(root, fn)
+            if not fpath.lower().endswith(".zip"):
+                continue
+            zf = ZipFile(fpath)
+            all_nums = set()
+            page_nums = set()
+            for zinfo in zf.infolist():
+                nums = extract_numbers(zinfo.filename)
+                for n in nums:
+                    all_nums.add(n)
+                if len(nums) > 0 and nums[-1] < 300:
+                    page_nums.add(nums[-1])
+            if len(page_nums) > 0:
+                missing = []
+                for p in range(min(page_nums), max(page_nums)):
+                    if not p in all_nums:
+                        missing += p,
+                if len(missing) >= len(page_nums):
+                    pass # too much missing, which is unlikely
+                elif len(missing) > 0:
+                    # remove continuous pages
+                    missing.sort()
+                    missing = remove_continuous_pages(missing)
+                    if len(missing) > 0:
+                        write_log("[warning] (inaccurate!) '%s' possibly missing pages: %s" % (fpath, ", ".join(map(str, missing))))
             scan_counter += 1
             if scan_counter % 100 == 0:
                 print "%d manga archives checked\r" % scan_counter
@@ -826,6 +897,8 @@ if __name__ == "__main__":
         mang_check_corrupt()
     elif sys.argv[1] == "check-cruft":
         mg_check_cruft()
+    elif sys.argv[1] == "check-missing":
+        mg_check_missing()
     elif sys.argv[1] == "download":
         mang_download()
     elif sys.argv[1] == "download-reverse":
