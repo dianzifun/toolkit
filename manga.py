@@ -52,6 +52,7 @@ available commands:
     check-corrupt        check for corrupt zip files and images
     check-cruft          find useless .DS_Store, Thumb.db files
     check-missing        find possible missing files
+    check-origin         check origin manga server to check if manga archives are healthy
     download             download a manga book
     download-reverse     download a manga book, in reverse order
     help                 display this help message
@@ -372,7 +373,7 @@ def mang_download_manhua178(manga_url, **opt):
                             err_log_f.close()
                         chapter_download_ok = False
                 except:
-                    backtrace.print_exc()
+                    traceback.print_exc()
                     err_log_f = open(error_log_fn, "a")
                     try:
                         err_log_f.write("failed to download: %s\n" % pg)
@@ -884,6 +885,164 @@ def mang_check_corrupt():
         print "*** PIL not installed! only checking for corrupt zip files!"
         util_check_corrupt_zip()
 
+
+def mg_check_178(dpath):
+    print "[MANGA DIR] %s" % dpath
+    f = open(os.path.join(dpath, "downloaded_from.txt"))
+    manga_url = f.read().strip()
+    f.close()
+    print "[MANGA URL] %s" % manga_url
+
+    root_page = manga_url
+    page_src = urllib2.urlopen(root_page).read()
+    idx = page_src.find("var g_comic_name = \"")
+    if idx < 0:
+        # fall back to gzip
+        page_src = gunzip_content(page_src)
+        idx = page_src.find("var g_comic_name = \"")
+        if idx < 0:
+            # failure again!
+            raise "failed to locate comic name ('g_comic_name')!"
+    idx += 20
+
+    idx2 = page_src.index("\r\n", idx) - 2
+    comic_name = page_src[idx:idx2].replace(" ", "").decode("utf-8")
+    comic_name = comic_name.strip()
+
+    idx = page_src.index("cartoon_online_border")
+    idx = page_src.index("<ul>", idx)
+    idx2 = page_src.index("<script type=\"", idx)
+    toc_src = page_src[idx:idx2]
+    toc_src_split = toc_src.split("\r\n")
+    toc_arr = []
+    for sp in toc_src_split:
+        idx = sp.find('<li><a title="')
+        if idx == -1:
+            continue
+        idx += 14
+        idx2 = sp.find('" href="', idx)
+        title = sp[idx:idx2]
+        idx = idx2 + 8
+        idx2 = sp.find('"', idx)
+        href = sp[idx:idx2]
+        if title.strip() == "":
+            continue
+        toc_arr += (title, href),
+
+    comic_name = comic_name.replace('/', "~")
+    comic_folder_path = MANGA_FOLDER + os.path.sep + comic_name + "(acg178)"
+
+    # check chapters
+    for chap in toc_arr:
+        zipf = None
+        try:
+            chap_title = chap[0].decode("utf-8")
+            chap_title = chap_title.replace('/', "~")
+            chap_title = chap_title.strip()
+            chap_href = chap[1]
+            chapter_folder_path = comic_folder_path + u"/" + chap_title
+
+            # pass chapter if zip exists or the folder does not have NOT_FINISHED & ERROR file
+            chapter_zip_fn = comic_folder_path + u"/" + chap_title + ".zip"
+            zipf = ZipFile(chapter_zip_fn)
+            if not os.path.exists(chapter_zip_fn):
+                print "zip not exists!"
+                continue
+
+            idx = root_page.rfind("/")
+            idx = root_page[0:idx].rfind("/")
+            base_url = root_page[0:idx]
+            if chap_href.startswith("http://"):
+                chap_url = chap_href
+            else:
+                chap_url = base_url + chap_href[2:]
+            chap_url = chap_url.replace(" ", "%20")
+
+            print "[CHAPTER URL] %s" % chap_url
+
+            chap_src = urllib2.urlopen(chap_url).read()
+            idx = chap_src.find("var pages")
+            if idx < 0:
+                # first fall back, gzipped content
+                chap_src = gunzip_content(chap_src)
+            idx = chap_src.find("var pages")
+            if idx < 0:
+                # second fall back
+                raise Exception("'var pages' not found!")
+            idx += 13
+            idx2 = chap_src.find("\r\n", idx) - 2
+            comic_pages_src = chap_src[idx:idx2].replace("\\/", "/")
+            comic_pages_url = eval(comic_pages_src)
+
+            chapter_download_ok = True # whether the chapter is successfully downloaded
+            for pg in comic_pages_url:
+                try:
+                    full_pg = (base_url + "/imgs/" + pg)
+                    idx = full_pg.rfind("/") + 1
+                    leaf_nm = full_pg[idx:]
+
+                    full_pg_unescaped = full_pg.decode("unicode_escape").encode("utf-8")
+                    full_pg_unescaped = full_pg_unescaped.replace(" ", "%20")
+
+                    pic_size = int(getheadersonly(full_pg_unescaped)["headers"]["Content-Length"])
+
+                    print leaf_nm, "(%s)" % pretty_fsize(pic_size), "<==", full_pg_unescaped
+
+                    # check page!
+                    try:
+                        info = zipf.getinfo(leaf_nm)
+                        if info.file_size != pic_size:
+                            write_log("[failure] checked by origin: '%s' in '%s', has bad file size: should be %d instead of %d" % (leaf_nm, chapter_zip_fn, pic_size, info.file_size))
+                    except KeyError:
+                        write_log("[failure] checked by origin: '%s' missing in '%s'" % (leaf_nm, chapter_zip_fn))
+                    else:
+                        print "pass!"
+
+                except:
+                    traceback.print_exc()
+                    time.sleep(1)
+
+        except:
+            traceback.print_exc()
+            time.sleep(1)
+        finally:
+            if zipf != None:
+                zipf.close()
+
+
+class HeadRequest(urllib2.Request):
+    def get_method(self):
+        return 'HEAD'
+
+def getheadersonly(url, redirections=True):
+    opener = urllib2.OpenerDirector()
+    opener.add_handler(urllib2.HTTPHandler())
+    opener.add_handler(urllib2.HTTPDefaultErrorHandler())
+    if redirections:
+        # HTTPErrorProcessor makes HTTPRedirectHandler work
+        opener.add_handler(urllib2.HTTPErrorProcessor())
+        opener.add_handler(urllib2.HTTPRedirectHandler())
+    try:
+        res = opener.open(HeadRequest(url))
+    except urllib2.HTTPError, res:
+        pass
+    res.close()
+    return dict(code=res.code, headers=res.info(), finalurl=res.geturl())
+
+
+def mg_check_origin():
+    for ent in os.listdir(MANGA_FOLDER):
+        dpath = os.path.join(MANGA_FOLDER, ent)
+        if not os.path.isdir(dpath):
+            continue
+        if "acg178" in dpath:
+            try:
+                mg_check_178(dpath)
+            except:
+                traceback.print_exc()
+                time.sleep(1)
+
+
 def mang_serve():
     port = get_config("http_svr_port")
     manga_folder = get_config("manga_folder")
@@ -899,6 +1058,8 @@ if __name__ == "__main__":
         mg_check_cruft()
     elif sys.argv[1] == "check-missing":
         mg_check_missing()
+    elif sys.argv[1] == "check-origin":
+        mg_check_origin()
     elif sys.argv[1] == "download":
         mang_download()
     elif sys.argv[1] == "download-reverse":
