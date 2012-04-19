@@ -983,8 +983,9 @@ def mg_check_178(dpath):
 
                     full_pg_unescaped = full_pg.decode("unicode_escape").encode("utf-8")
                     full_pg_unescaped = full_pg_unescaped.replace(" ", "%20")
+                    response_header = getheadersonly(full_pg_unescaped)["headers"]
 
-                    pic_size = int(getheadersonly(full_pg_unescaped)["headers"]["Content-Length"])
+                    pic_size = int(response_header["Content-Length"])
 
                     print leaf_nm, "(%s)" % pretty_fsize(pic_size), "<==", full_pg_unescaped
 
@@ -993,6 +994,7 @@ def mg_check_178(dpath):
                         info = zipf.getinfo(leaf_nm)
                         if info.file_size != pic_size:
                             write_log("[failure] checked by origin: '%s' in '%s', has bad file size: should be %d instead of %d" % (leaf_nm, chapter_zip_fn, pic_size, info.file_size))
+                            write_log(str(response_header))
                     except KeyError:
                         write_log("[failure] checked by origin: '%s' missing in '%s'" % (leaf_nm, chapter_zip_fn))
                     else:
