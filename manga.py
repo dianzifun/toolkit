@@ -59,10 +59,48 @@ available commands:
     list-library         list contents in library
     pack-all             packup all manga books
     server               start SimpleHTTPServer for ComicGlass on iOS
+    stat                 state info about all manga book
     update               update specified managed manga books
     update-all           update all managed manga books
 
 author: Santa Zhang (santa1987@gmail.com)"""
+
+def mg_stat():
+    zip_cnt = 0
+    img_cnt = 0
+    zip_total_size = 0
+    img_total_size = 0
+    max_img_per_zip = 0
+    scan_counter = 0
+    max_img_zip_fn = ""
+    for root, dirnames, fnames in os.walk(MANGA_FOLDER):
+        for fn in fnames:
+            fpath = os.path.join(root, fn)
+            if not fpath.lower().endswith(".zip"):
+                continue
+            this_img_cnt = 0
+            zip_cnt += 1
+            zip_total_size += os.stat(fpath).st_size
+            zf = ZipFile(fpath)
+            for zinfo in zf.infolist():
+                if is_image(zinfo.filename):
+                    img_cnt += 1
+                    this_img_cnt += 1
+                    img_total_size += zinfo.file_size
+            scan_counter += 1
+            if scan_counter % 100 == 0:
+                print "%d manga archives checked\r" % scan_counter
+            if max_img_per_zip < this_img_cnt:
+                max_img_per_zip = this_img_cnt
+                max_img_zip_fn = fpath
+    if scan_counter % 100 != 0:
+        print "%d manga archives checked\r" % scan_counter
+    print
+    print "%d zip archives" % zip_cnt
+    print "%s total zip size" % pretty_fsize(zip_total_size)
+    print "%d images" % img_cnt
+    print "%s total image size" % pretty_fsize(img_total_size)
+    print "max: %d images in one zip (%s)" % (max_img_per_zip, max_img_zip_fn)
 
 
 def mg_check_cruft():
@@ -799,9 +837,13 @@ def util_check_corrupt_zip():
                 the_zip_file = ZipFile(fpath)
                 ret = the_zip_file.testzip()
                 if ret is not None:
-                    print "*** first bad file in zip: %s" % ret
-                    write_log("[corrupt] bad file '%s' in zip archive '%s'" % (ret, fpath))
-                    bad_list += (fpath, ret),
+                    try:
+                        print "*** first bad file in zip: %s" % ret
+                        write_log("[corrupt] bad file '%s' in zip archive '%s'" % (ret, fpath))
+                    except:
+                        traceback.print_exc()
+                    finally:
+                        bad_list += (fpath, ret),
                 the_zip_file.close()
 
     if len(bad_list) == 0:
@@ -992,13 +1034,11 @@ def mg_check_178(dpath):
                     # check page!
                     try:
                         info = zipf.getinfo(leaf_nm)
-                        if info.file_size != pic_size:
-                            write_log("[failure] checked by origin: '%s' in '%s', has bad file size: should be %d instead of %d" % (leaf_nm, chapter_zip_fn, pic_size, info.file_size))
+                        if info.file_size != pic_size and response_header["Content-Type"].lower().startswith("image"):
+                            write_log("[failure] '%s' in '%s': fsize should be %d not %d" % (leaf_nm.encode("utf-8"), chapter_zip_fn.encode("utf-8"), pic_size, info.file_size))
                             write_log(str(response_header))
                     except KeyError:
                         write_log("[failure] checked by origin: '%s' missing in '%s'" % (leaf_nm, chapter_zip_fn))
-                    else:
-                        print "pass!"
 
                 except:
                     traceback.print_exc()
@@ -1072,6 +1112,8 @@ if __name__ == "__main__":
         mang_pack_all()
     elif sys.argv[1] == "server":
         mang_serve()
+    elif sys.argv[1] == "stat":
+        mg_stat()
     elif sys.argv[1] == "update":
         mang_update()
     elif sys.argv[1] == "update-all":

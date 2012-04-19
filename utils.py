@@ -280,7 +280,7 @@ def write_log(text):
     try:
         f.write("[%s] %s\n" % (tm, text))
     except:
-        pass
+        traceback.print_exc()
     f.close()
 
 def random_token(size=5):
