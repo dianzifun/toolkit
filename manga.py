@@ -112,13 +112,15 @@ def mg_check_cruft():
                 continue
             zf = ZipFile(fpath)
             has_cruft = False
+            cruft_fn = ""
             for zinfo in zf.infolist():
                 test_str = zinfo.filename.lower()
-                if test_str.endswith(".ds_store") or test_str.endswith("thumbs.db"):
+                if test_str.endswith(".ds_store") or test_str.endswith("thumbs.db") or test_str.endswith(".txt") or test_str.endswith(".url")  or test_str.endswith(".html") or test_str.endswith(".db") or test_str.endswith(".nfo") or test_str.endswith(".sfv") or test_str.endswith(".jar") or test_str.endswith("housekeeper.crc32") or test_str.endswith(".jp") or test_str.endswith(".ion") or test_str.endswith(".doc"):
                     has_cruft = True
+                    cruft_fn = zinfo.filename
                     break
             if has_cruft:
-                write_log("[warning] has cruft file: '%s'" % fpath)
+                write_log("[warning] has cruft file: '%s' (curft='%s')" % (fpath, cruft_fn))
             scan_counter += 1
             if scan_counter % 100 == 0:
                 print "%d manga archives checked\r" % scan_counter
@@ -232,7 +234,12 @@ def mang_ensure_manga_packed_walker(arg, dirname, fnames):
 
     # do zipping
     print "zipping"
-    if zipdir(dirname, archive_name) == True:
+
+    def ignore_func(fn):
+        fn = fn.lower()
+        return fn.endswith(".ds_store") or fn.endswith("thumbs.db") or fn.endswith(".txt") or fn.endswith(".url") or fn.endswith(".html") or fn.endswith(".db") or fn.endswith(".nfo") or fn.endswith(".sfv") or fn.endswith(".jar") or fn.endswith("housekeeper.crc32") or fn.endswith(".jp") or fn.endswith(".ion") or fn.endswith(".doc")
+
+    if zipdir(dirname, archive_name, ignore_func) == True:
         shutil.rmtree(dirname)
         print "zip done, removing original folder"
     else:
