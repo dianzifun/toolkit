@@ -12,6 +12,9 @@ import time
 import traceback
 import shutil
 import socket
+import zlib
+import gzip
+import zipfile
 import urllib2
 from urllib2 import HTTPError
 from utils import *
@@ -47,18 +50,152 @@ usage: manga.py <command>
 available commands:
 
     check-corrupt        check for corrupt zip files and images
+    check-cruft          find useless .DS_Store, Thumb.db files
+    check-missing        find possible missing files
+    check-origin [dir]   check origin manga server to check if manga archives are healthy
     download             download a manga book
     download-reverse     download a manga book, in reverse order
     help                 display this help message
     list-library         list contents in library
     pack-all             packup all manga books
     server               start SimpleHTTPServer for ComicGlass on iOS
+    stat                 state info about all manga book
     update               update specified managed manga books
     update-all           update all managed manga books
 
 author: Santa Zhang (santa1987@gmail.com)"""
 
+def mg_stat():
+    zip_cnt = 0
+    img_cnt = 0
+    zip_total_size = 0
+    img_total_size = 0
+    max_img_per_zip = 0
+    scan_counter = 0
+    max_img_zip_fn = ""
+    for root, dirnames, fnames in os.walk(MANGA_FOLDER):
+        for fn in fnames:
+            fpath = os.path.join(root, fn)
+            if not fpath.lower().endswith(".zip"):
+                continue
+            this_img_cnt = 0
+            zip_cnt += 1
+            zip_total_size += os.stat(fpath).st_size
+            zf = ZipFile(fpath)
+            for zinfo in zf.infolist():
+                if is_image(zinfo.filename):
+                    img_cnt += 1
+                    this_img_cnt += 1
+                    img_total_size += zinfo.file_size
+            scan_counter += 1
+            if scan_counter % 100 == 0:
+                print "%d manga archives checked\r" % scan_counter
+            if max_img_per_zip < this_img_cnt:
+                max_img_per_zip = this_img_cnt
+                max_img_zip_fn = fpath
+    if scan_counter % 100 != 0:
+        print "%d manga archives checked\r" % scan_counter
+    print
+    print "%d zip archives" % zip_cnt
+    print "%s total zip size" % pretty_fsize(zip_total_size)
+    print "%d images" % img_cnt
+    print "%s total image size" % pretty_fsize(img_total_size)
+    print "max: %d images in one zip (%s)" % (max_img_per_zip, max_img_zip_fn)
 
+
+def mg_check_cruft():
+    scan_counter = 0
+    for root, dirnames, fnames in os.walk(MANGA_FOLDER):
+        for fn in fnames:
+            fpath = os.path.join(root, fn)
+            if not fpath.lower().endswith(".zip"):
+                continue
+            zf = ZipFile(fpath)
+            has_cruft = False
+            cruft_fn = ""
+            for zinfo in zf.infolist():
+                test_str = zinfo.filename.lower()
+                if test_str.endswith(".ds_store") or test_str.endswith("thumbs.db") or test_str.endswith(".txt") or test_str.endswith(".url")  or test_str.endswith(".html") or test_str.endswith(".db") or test_str.endswith(".nfo") or test_str.endswith(".sfv") or test_str.endswith(".jar") or test_str.endswith("housekeeper.crc32") or test_str.endswith(".jp") or test_str.endswith(".ion") or test_str.endswith(".doc"):
+                    has_cruft = True
+                    cruft_fn = zinfo.filename
+                    break
+            if has_cruft:
+                write_log("[warning] has cruft file: '%s' (curft='%s')" % (fpath, cruft_fn))
+            scan_counter += 1
+            if scan_counter % 100 == 0:
+                print "%d manga archives checked\r" % scan_counter
+    if scan_counter % 100 != 0:
+        print "%d manga archives checked\r" % scan_counter
+
+
+def extract_numbers(str):
+    nums = []
+    s = ""
+    for c in str:
+        if c.isdigit():
+            s += c
+        elif s != "":
+            nums += int(s),
+            s = ""
+    if s != "":
+        nums += s,
+    return nums
+
+
+def remove_continuous_pages(pages):
+    if len(pages) < 5:
+        return pages
+    idx = 0
+    idx2 = 1
+    while idx2 < len(pages):
+        if pages[idx2] == pages[idx2 - 1] + 1:
+            pass
+        else:
+            if idx2 - idx >= 5:
+                # do crop
+                pages = pages[:idx] + pages[idx2 + 1:]
+            idx = idx2
+        idx2 += 1
+    if idx2 - idx >= 5:
+        pages = pages[:idx] + pages[idx2 + 1:]
+    return pages
+
+
+def mg_check_missing():
+    # very inaccurate algorithm
+    scan_counter = 0
+    for root, dirnames, fnames in os.walk(MANGA_FOLDER):
+        for fn in fnames:
+            fpath = os.path.join(root, fn)
+            if not fpath.lower().endswith(".zip"):
+                continue
+            zf = ZipFile(fpath)
+            all_nums = set()
+            page_nums = set()
+            for zinfo in zf.infolist():
+                nums = extract_numbers(zinfo.filename)
+                for n in nums:
+                    all_nums.add(n)
+                if len(nums) > 0 and nums[-1] < 300:
+                    page_nums.add(nums[-1])
+            if len(page_nums) > 0:
+                missing = []
+                for p in range(min(page_nums), max(page_nums)):
+                    if not p in all_nums:
+                        missing += p,
+                if len(missing) >= len(page_nums):
+                    pass # too much missing, which is unlikely
+                elif len(missing) > 0:
+                    # remove continuous pages
+                    missing.sort()
+                    missing = remove_continuous_pages(missing)
+                    if len(missing) > 0:
+                        write_log("[warning] (inaccurate!) '%s' possibly missing pages: %s" % (fpath, ", ".join(map(str, missing))))
+            scan_counter += 1
+            if scan_counter % 100 == 0:
+                print "%d manga archives checked\r" % scan_counter
+    if scan_counter % 100 != 0:
+        print "%d manga archives checked\r" % scan_counter
 
 def mang_is_image(fname):
     return is_image(fname)
@@ -97,7 +234,12 @@ def mang_ensure_manga_packed_walker(arg, dirname, fnames):
 
     # do zipping
     print "zipping"
-    if zipdir(dirname, archive_name) == True:
+
+    def ignore_func(fn):
+        fn = fn.lower()
+        return fn.endswith(".ds_store") or fn.endswith("thumbs.db") or fn.endswith(".txt") or fn.endswith(".url") or fn.endswith(".html") or fn.endswith(".db") or fn.endswith(".nfo") or fn.endswith(".sfv") or fn.endswith(".jar") or fn.endswith("housekeeper.crc32") or fn.endswith(".jp") or fn.endswith(".ion") or fn.endswith(".doc")
+
+    if zipdir(dirname, archive_name, ignore_func) == True:
         shutil.rmtree(dirname)
         print "zip done, removing original folder"
     else:
@@ -117,11 +259,32 @@ def mang_pack_all():
         if os.path.isdir(fpath):
             mang_ensure_manga_packed(fpath)
 
+def gunzip_content(data):
+    try:
+        gz_f = open("/tmp/manga.py.tmp.gz", "wb")
+        gz_f.write(data)
+        gz_f.close()
+        gz_f = gzip.open("/tmp/manga.py.tmp.gz", "r")
+        orig_data = gz_f.read()
+        gz_f.close()
+    finally:
+        os.remove("/tmp/manga.py.tmp.gz")
+    return orig_data
+
 def mang_download_manhua178(manga_url, **opt):
     print "[toc] %s" % manga_url
     root_page = manga_url
     page_src = urllib2.urlopen(root_page).read()
-    idx = page_src.index("var g_comic_name = \"") + 20
+    idx = page_src.find("var g_comic_name = \"")
+    if idx < 0:
+        # fall back to gzip
+        page_src = gunzip_content(page_src)
+        idx = page_src.find("var g_comic_name = \"")
+        if idx < 0:
+            # failure again!
+            raise "failed to locate comic name ('g_comic_name')!"
+    idx += 20
+
     idx2 = page_src.index("\r\n", idx) - 2
     comic_name = page_src[idx:idx2].replace(" ", "").decode("utf-8")
     comic_name = comic_name.strip()
@@ -200,8 +363,12 @@ def mang_download_manhua178(manga_url, **opt):
             chap_src = urllib2.urlopen(chap_url).read()
             idx = chap_src.find("var pages")
             if idx < 0:
-                print chap_src
-                raise "'var pages' not found!"
+                # first fall back, gzipped content
+                chap_src = gunzip_content(chap_src)
+            idx = chap_src.find("var pages")
+            if idx < 0:
+                # second fall back
+                raise Exception("'var pages' not found!")
             idx += 13
             idx2 = chap_src.find("\r\n", idx) - 2
             comic_pages_src = chap_src[idx:idx2].replace("\\/", "/")
@@ -216,36 +383,45 @@ def mang_download_manhua178(manga_url, **opt):
 
             chapter_download_ok = True # whether the chapter is successfully downloaded
             for pg in comic_pages_url:
-                full_pg = (base_url + "/imgs/" + pg)
-                idx = full_pg.rfind("/") + 1
-                leaf_nm = full_pg[idx:]
-                print leaf_nm
-                fn = comic_folder_path + u"/" + chap_title + u"/" + leaf_nm.decode("unicode_escape")
-                mang_message(fn)
-                down_filename = fn
-                if os.path.exists(down_filename):
-                    mang_message("[pass] %s" % down_filename)
-                    continue
-                down_f = None
-                full_pg_unescaped = full_pg.decode("unicode_escape").encode("utf-8")
-                full_pg_unescaped = full_pg_unescaped.replace(" ", "%20")
                 try:
-                    down_data = urllib2.urlopen(full_pg_unescaped).read()
-                    down_f = open(fn + u".tmp", "wb")
-                    down_f.write(down_data)
-                    down_f.close()
-                    shutil.move(fn + u".tmp", fn)
-                except HTTPError, e:
-                    print "download failure!"
-                    if down_f != None:
+                    full_pg = (base_url + "/imgs/" + pg)
+                    idx = full_pg.rfind("/") + 1
+                    leaf_nm = full_pg[idx:]
+                    print leaf_nm
+                    fn = comic_folder_path + u"/" + chap_title + u"/" + leaf_nm.decode("unicode_escape")
+                    mang_message(fn)
+                    down_filename = fn
+                    if os.path.exists(down_filename):
+                        mang_message("[pass] %s" % down_filename)
+                        continue
+                    down_f = None
+                    full_pg_unescaped = full_pg.decode("unicode_escape").encode("utf-8")
+                    full_pg_unescaped = full_pg_unescaped.replace(" ", "%20")
+                    try:
+                        down_data = urllib2.urlopen(full_pg_unescaped).read()
+                        down_f = open(fn + u".tmp", "wb")
+                        down_f.write(down_data)
                         down_f.close()
-                    if os.path.exists(fn + u".tmp"):
-                        os.remove(fn + u".tmp")
+                        shutil.move(fn + u".tmp", fn)
+                    except HTTPError, e:
+                        print "download failure!"
+                        if down_f != None:
+                            down_f.close()
+                        if os.path.exists(fn + u".tmp"):
+                            os.remove(fn + u".tmp")
+                        err_log_f = open(error_log_fn, "a")
+                        try:
+                            err_log_f.write("failed to download: %s\n" % fn)
+                        except:
+                            err_log_f.write("failed to download from: %s\n" % full_pg_unescaped)
+                        finally:
+                            err_log_f.close()
+                        chapter_download_ok = False
+                except:
+                    traceback.print_exc()
                     err_log_f = open(error_log_fn, "a")
                     try:
-                        err_log_f.write("failed to download: %s\n" % fn)
-                    except:
-                        err_log_f.write("failed to download from: %s\n" % full_pg_unescaped)
+                        err_log_f.write("failed to download: %s\n" % pg)
                     finally:
                         err_log_f.close()
                     chapter_download_ok = False
@@ -657,7 +833,6 @@ def mang_list_library():
 
 
 def util_check_corrupt_zip():
-    import zipfile
     tmp_folder = get_config("tmp_folder")
     print "tmp folder:", tmp_folder
     bad_list = []
@@ -666,11 +841,16 @@ def util_check_corrupt_zip():
             fpath = os.path.join(root, fn)
             if fpath.lower().endswith(".zip"):
                 print "checking zip file:", fpath
-                the_zip_file = zipfile.ZipFile(fpath)
+                the_zip_file = ZipFile(fpath)
                 ret = the_zip_file.testzip()
                 if ret is not None:
-                    print "*** first bad file in zip: %s" % ret
-                    bad_list += (fpath, ret),
+                    try:
+                        print "*** first bad file in zip: %s" % ret
+                        write_log("[corrupt] bad file '%s' in zip archive '%s'" % (ret, fpath))
+                    except:
+                        traceback.print_exc()
+                    finally:
+                        bad_list += (fpath, ret),
                 the_zip_file.close()
 
     if len(bad_list) == 0:
@@ -678,7 +858,7 @@ def util_check_corrupt_zip():
     else:
         print "*** corruption found:"
         for bad in bad_list:
-            print bad
+            print "%s, %s" % (bad[0], bad[1])
 
 
 # used in util_check_corrupt_images_in_zip, wrap binary as a file object for PIL
@@ -715,10 +895,9 @@ class FileObjForPIL(object):
 
 
 def util_check_corrupt_images_in_zip(fpath):
-    import zipfile
     from PIL import Image
     print "checking images in zip file:", fpath
-    zf = zipfile.ZipFile(fpath)
+    zf = ZipFile(fpath)
     for zinfo in zf.infolist():
         if is_image(zinfo.filename.lower()):
             zobj = zf.open(zinfo.filename, "r")
@@ -755,6 +934,169 @@ def mang_check_corrupt():
         print "*** PIL not installed! only checking for corrupt zip files!"
         util_check_corrupt_zip()
 
+
+def mg_check_178(dpath):
+    print "[MANGA DIR] %s" % dpath
+    f = open(os.path.join(dpath, "downloaded_from.txt"))
+    manga_url = f.read().strip()
+    f.close()
+    print "[MANGA URL] %s" % manga_url
+
+    root_page = manga_url
+    page_src = urllib2.urlopen(root_page).read()
+    idx = page_src.find("var g_comic_name = \"")
+    if idx < 0:
+        # fall back to gzip
+        page_src = gunzip_content(page_src)
+        idx = page_src.find("var g_comic_name = \"")
+        if idx < 0:
+            # failure again!
+            raise "failed to locate comic name ('g_comic_name')!"
+    idx += 20
+
+    idx2 = page_src.index("\r\n", idx) - 2
+    comic_name = page_src[idx:idx2].replace(" ", "").decode("utf-8")
+    comic_name = comic_name.strip()
+
+    idx = page_src.index("cartoon_online_border")
+    idx = page_src.index("<ul>", idx)
+    idx2 = page_src.index("<script type=\"", idx)
+    toc_src = page_src[idx:idx2]
+    toc_src_split = toc_src.split("\r\n")
+    toc_arr = []
+    for sp in toc_src_split:
+        idx = sp.find('<li><a title="')
+        if idx == -1:
+            continue
+        idx += 14
+        idx2 = sp.find('" href="', idx)
+        title = sp[idx:idx2]
+        idx = idx2 + 8
+        idx2 = sp.find('"', idx)
+        href = sp[idx:idx2]
+        if title.strip() == "":
+            continue
+        toc_arr += (title, href),
+
+    comic_name = comic_name.replace('/', "~")
+    comic_folder_path = MANGA_FOLDER + os.path.sep + comic_name + "(acg178)"
+
+    # check chapters
+    for chap in toc_arr:
+        zipf = None
+        try:
+            chap_title = chap[0].decode("utf-8")
+            chap_title = chap_title.replace('/', "~")
+            chap_title = chap_title.strip()
+            chap_href = chap[1]
+            chapter_folder_path = comic_folder_path + u"/" + chap_title
+
+            # pass chapter if zip exists or the folder does not have NOT_FINISHED & ERROR file
+            chapter_zip_fn = comic_folder_path + u"/" + chap_title + ".zip"
+            zipf = ZipFile(chapter_zip_fn)
+            if not os.path.exists(chapter_zip_fn):
+                print "zip not exists!"
+                continue
+
+            idx = root_page.rfind("/")
+            idx = root_page[0:idx].rfind("/")
+            base_url = root_page[0:idx]
+            if chap_href.startswith("http://"):
+                chap_url = chap_href
+            else:
+                chap_url = base_url + chap_href[2:]
+            chap_url = chap_url.replace(" ", "%20")
+
+            print "[CHAPTER URL] %s" % chap_url
+
+            chap_src = urllib2.urlopen(chap_url).read()
+            idx = chap_src.find("var pages")
+            if idx < 0:
+                # first fall back, gzipped content
+                chap_src = gunzip_content(chap_src)
+            idx = chap_src.find("var pages")
+            if idx < 0:
+                # second fall back
+                raise Exception("'var pages' not found!")
+            idx += 13
+            idx2 = chap_src.find("\r\n", idx) - 2
+            comic_pages_src = chap_src[idx:idx2].replace("\\/", "/")
+            comic_pages_url = eval(comic_pages_src)
+
+            chapter_download_ok = True # whether the chapter is successfully downloaded
+            for pg in comic_pages_url:
+                try:
+                    full_pg = (base_url + "/imgs/" + pg)
+                    idx = full_pg.rfind("/") + 1
+                    leaf_nm = full_pg[idx:]
+
+                    full_pg_unescaped = full_pg.decode("unicode_escape").encode("utf-8")
+                    full_pg_unescaped = full_pg_unescaped.replace(" ", "%20")
+                    response_header = getheadersonly(full_pg_unescaped)["headers"]
+
+                    pic_size = int(response_header["Content-Length"])
+
+                    print leaf_nm, "(%s)" % pretty_fsize(pic_size), "<==", full_pg_unescaped
+
+                    # check page!
+                    try:
+                        info = zipf.getinfo(leaf_nm)
+                        if info.file_size != pic_size and response_header["Content-Type"].lower().startswith("image"):
+                            write_log("[failure] '%s' in '%s': fsize should be %d not %d" % (leaf_nm.encode("utf-8"), chapter_zip_fn.encode("utf-8"), pic_size, info.file_size))
+                            write_log(str(response_header))
+                    except KeyError:
+                        write_log("[failure] checked by origin: '%s' missing in '%s'" % (leaf_nm, chapter_zip_fn))
+
+                except:
+                    traceback.print_exc()
+                    time.sleep(1)
+
+        except:
+            traceback.print_exc()
+            time.sleep(1)
+        finally:
+            if zipf != None:
+                zipf.close()
+
+
+class HeadRequest(urllib2.Request):
+    def get_method(self):
+        return 'HEAD'
+
+def getheadersonly(url, redirections=True):
+    opener = urllib2.OpenerDirector()
+    opener.add_handler(urllib2.HTTPHandler())
+    opener.add_handler(urllib2.HTTPDefaultErrorHandler())
+    if redirections:
+        # HTTPErrorProcessor makes HTTPRedirectHandler work
+        opener.add_handler(urllib2.HTTPErrorProcessor())
+        opener.add_handler(urllib2.HTTPRedirectHandler())
+    try:
+        res = opener.open(HeadRequest(url))
+    except urllib2.HTTPError, res:
+        pass
+    res.close()
+    return dict(code=res.code, headers=res.info(), finalurl=res.geturl())
+
+
+def mg_check_origin():
+    if len(sys.argv) > 2:
+        dpath = sys.argv[2]
+        if "acg178" in dpath:
+            mg_check_178(dpath)
+    else:
+        for ent in os.listdir(MANGA_FOLDER):
+            dpath = os.path.join(MANGA_FOLDER, ent)
+            if not os.path.isdir(dpath):
+                continue
+            if "acg178" in dpath:
+                try:
+                    mg_check_178(dpath)
+                except:
+                    traceback.print_exc()
+                    time.sleep(1)
+
+
 def mang_serve():
     port = get_config("http_svr_port")
     manga_folder = get_config("manga_folder")
@@ -766,6 +1108,12 @@ if __name__ == "__main__":
         mang_print_help()
     elif sys.argv[1] == "check-corrupt":
         mang_check_corrupt()
+    elif sys.argv[1] == "check-cruft":
+        mg_check_cruft()
+    elif sys.argv[1] == "check-missing":
+        mg_check_missing()
+    elif sys.argv[1] == "check-origin":
+        mg_check_origin()
     elif sys.argv[1] == "download":
         mang_download()
     elif sys.argv[1] == "download-reverse":
@@ -776,6 +1124,8 @@ if __name__ == "__main__":
         mang_pack_all()
     elif sys.argv[1] == "server":
         mang_serve()
+    elif sys.argv[1] == "stat":
+        mg_stat()
     elif sys.argv[1] == "update":
         mang_update()
     elif sys.argv[1] == "update-all":

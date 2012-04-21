@@ -10,6 +10,7 @@ from __future__ import with_statement
 from contextlib import closing
 import urllib
 import sys
+import hashlib
 import os
 import re
 import time
@@ -18,6 +19,7 @@ import shutil
 import traceback
 import sqlite3
 import csv
+import plistlib
 from subprocess import Popen, PIPE, STDOUT
 from urllib2 import *
 from utils import *
@@ -831,11 +833,37 @@ def get_du_of_folder(folder):
                 du += os.stat(fpath).st_size
     return du
 
+def hk_backup_nds():
+    tmp_folder = get_config("tmp_folder")
+    nds_root = get_config("nds_root")
+    bkup_folder = os.path.join(get_config("dropbox_folder"), "Backups")
+    bkup_job_name = "nds_backup.%s" % (time.strftime("%y%m%d-%H%M%S", time.localtime()))
+    tmp_cp_folder = os.path.join(tmp_folder, bkup_job_name)
+    hk_make_dirs(os.path.join(tmp_cp_folder, "GAMES"))
+    hk_make_dirs(os.path.join(tmp_cp_folder, "NDSGBA", "gamerts"))
+    hk_make_dirs(os.path.join(tmp_cp_folder, "NDSSFC", "gamerts"))
+
+    hk_exec("cp -v %s/*.sav '%s'" % (os.path.join(nds_root, "GAMES"), os.path.join(tmp_cp_folder, "GAMES")))
+    hk_exec("cp -v %s/*.SAV '%s'" % (os.path.join(nds_root, "GAMES"), os.path.join(tmp_cp_folder, "GAMES")))
+#    hk_exec("cp -v %s/*.rtf* '%s'" % (os.path.join(nds_root, "GAMES"), os.path.join(tmp_cp_folder, "GAMES")))
+#    hk_exec("cp -v %s/*.RTF* '%s'" % (os.path.join(nds_root, "GAMES"), os.path.join(tmp_cp_folder, "GAMES")))
+
+    hk_exec("cp -v %s/*.sav '%s'" % (os.path.join(nds_root, "NDSGBA", "gamerts"), os.path.join(tmp_cp_folder, "NDSGBA", "gamerts")))
+    hk_exec("cp -v %s/*.SAV '%s'" % (os.path.join(nds_root, "NDSSFC", "gamerts"), os.path.join(tmp_cp_folder, "NDSSFC", "gamerts")))
+
+    print "zipping...."
+    zipdir(tmp_cp_folder, tmp_cp_folder + ".zip")
+    print "[rmdir] %s" % tmp_cp_folder
+    shutil.rmtree(tmp_cp_folder)
+    shutil.move(tmp_cp_folder + ".zip", bkup_folder)
+    print "done!"
+
+
 def hk_backup_psp():
     tmp_folder = get_config("tmp_folder")
     psp_root = get_config("psp_root")
     bkup_folder = os.path.join(get_config("dropbox_folder"), "Backups")
-    bkup_job_name = "psp_backup.%s" % (time.strftime("%y%m%d-%H%M%S", time.localtime()))
+    bkup_job_name = "nds_backup.%s" % (time.strftime("%y%m%d-%H%M%S", time.localtime()))
     tmp_cp_folder = os.path.join(tmp_folder, bkup_job_name)
     hk_make_dirs(tmp_cp_folder)
     tmp_savedata_dir = os.path.join(tmp_cp_folder, "PSP", "SAVEDATA")
@@ -1434,6 +1462,61 @@ def hk_tunet_status():
     os.system("curl -s -b PHPSESSID=%s -d 'action=logout' -k 'https://usereg.tsinghua.edu.cn/do.php' -o /dev/null" % sess_id)
 
 
+def hk_check_contacts():
+    vcf_dir = "/Users/santa/Dropbox/Contacts"
+    vcf_list = []
+    for fn in os.listdir(vcf_dir):
+        if fn.endswith(".vcf"):
+            name = fn[:-4].decode("utf-8")
+            print ".vcf:", name
+            vcf_list += name,
+    ab_list = []
+    ab_root_dir = "/Users/santa/Library/Application Support/AddressBook/Sources"
+    ab_dir = None
+    for fn in os.listdir(ab_root_dir):
+        if len(fn) == 36:
+            ab_dir = os.path.join(ab_root_dir, fn, "Metadata")
+    if ab_dir == None:
+        print "Cannot find AddressBook contacts!"
+        exit(1)
+    for fn in os.listdir(ab_dir):
+        if fn.endswith(".abcdp") == False:
+            continue
+        fpath = os.path.join(ab_dir, fn)
+        tmp_fn = "/tmp/housekeeper-contact.abcdp"
+        os.system("cp '%s' '%s'" % (fpath, tmp_fn))
+        os.system("plutil -convert xml1 '%s'" % tmp_fn)
+        pl = plistlib.readPlist(tmp_fn)
+        if "First" in pl.keys() and "Last" in pl.keys():
+            name = (pl["First"] + " " + pl["Last"]).strip()
+        elif "First" in pl.keys():
+            name = pl["First"]
+        elif "Last" in pl.keys():
+            name = pl["Last"]
+        if name in ab_list:
+            print "AddressBook dup:", name
+        ab_list += name,
+        os.remove(tmp_fn)
+    for n in vcf_list:
+        if n not in ab_list:
+            print "Only in .vcf:", n
+    for n in ab_list:
+        if n not in vcf_list:
+            print "Only in AddressBook:", n
+
+def hk_nds_ls(nds_game_dir):
+    for fn in os.listdir(nds_game_dir):
+        if not fn.lower().endswith(".nds"):
+            continue
+        fpath = os.path.join(nds_game_dir, fn)
+        f = open(fpath, "rb")
+        game_id = f.read(12).strip()
+        m = hashlib.md5()
+        m.update(f.read(1024 * 1024))
+        game_finger = m.hexdigest()
+        f.close()
+        print "%s id='%s' fn='%s'" % (game_finger, game_id, fn)
+
 def hk_help():
     print """housekeeper.py: helper script to manage my important collections
 usage: housekeeper.py <command>
@@ -1443,8 +1526,10 @@ available commands:
     backup-conf                        backup my config files
     backup-evernote                    bakcup evernote documents
     backup-psp                         backup my psp
+    backup-nds                         backup my nds
     batch-rename                       batch rename files under a folder
     check-ascii-fnames                 make sure all file has ascii-only name
+    check-contacts                     check for contacts folder (mac only)
     check-crc32                        check file integrity by crc32
     clean-eject-usb <name>             cleanly eject usb drives (cleans .Trash, .SpotLight folders)
     gem-cleanup                        cleanup gem files
@@ -1460,6 +1545,7 @@ available commands:
     itunes-stats                       display iTunes library info
     jpeg2jpg                           convert .jpeg ext name to .jpg
     lowercase-ext                      make sure file extensions are lower case
+    nds-ls                             list NDS games info
     psp-sync-pic                       sync images to psp
     papers-find-ophan                  check if pdf is in papers folder but not in Papers library
     rm-all-gems                        remove all rubygems (currently Mac only)
@@ -1494,8 +1580,12 @@ if __name__ == "__main__":
         hk_backup_evernote()
     elif sys.argv[1] == "backup-psp":
         hk_backup_psp()
+    elif sys.argv[1] == "backup-nds":
+        hk_backup_nds()
     elif sys.argv[1] == "batch-rename":
         hk_batch_rename()
+    elif sys.argv[1] == "check-contacts":
+        hk_check_contacts()
     elif sys.argv[1] == "check-crc32":
         hk_check_crc32()
     elif sys.argv[1] == "check-ascii-fnames":
@@ -1529,6 +1619,11 @@ if __name__ == "__main__":
         hk_jpeg2jpg()
     elif sys.argv[1] == "lowercase-ext":
         hk_lowercase_ext()
+    elif sys.argv[1] == "nds-ls":
+        if len(sys.argv) < 3:
+            print "usage: housekeeper.py nds-ls <nds-game-dir>"
+            exit(0)
+        hk_nds_ls(sys.argv[2])
     elif sys.argv[1] == "psp-sync-pic":
         hk_psp_sync_pic()
     elif sys.argv[1] == "papers-find-ophan":

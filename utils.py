@@ -112,16 +112,23 @@ def zip_add_file(zip_file, file_path):
     return ok
 
 
-def zipdir(basedir, archivename):
+def zipdir(basedir, archivename, ignore_func=None):
     ok = True
     assert os.path.isdir(basedir)
+
+    def default_ignore_func(fn):
+        return fn.lower() == ".ds_store" or fn.lower() == "thumbs.db"
+
+    if ignore_func == None:
+        ignore_func = default_ignore_func
+
     with closing(ZipFile(archivename, "w", ZIP_DEFLATED)) as z:
         for root, dirs, files in os.walk(basedir):
             #NOTE: ignore empty directories
             for fn in files:
                 # ignore useless files
                 absfn = os.path.join(root, fn)
-                if fn.lower() == ".ds_store" or fn.lower() == "thumbs.db":
+                if ignore_func(fn):
                     print "exclude useless file '%s' from zip file" % absfn
                     continue
                 try:
@@ -278,9 +285,14 @@ def write_log(text):
     f = open(log_fn, "a")
     tm = time.strftime("%Y.%m.%d %H:%M:%S", time.localtime())
     try:
-        f.write("[%s] %s\n" % (tm, text))
+        f.write("[%s] " % tm)
+        try:
+            f.write(text.encode("utf-8"))
+        except:
+            f.write(text)
+        f.write("\n")
     except:
-        pass
+        traceback.print_exc()
     f.close()
 
 def random_token(size=5):
