@@ -1332,17 +1332,9 @@ def hk_timemachine_image():
     </plist>""" % uuid)
     f.close()
 
-def hk_rsync_to_labpc():
-    if os.path.exists("/Volumes/Takaramono$"):
-        print "Backing up to /Volumes/Takaramono$"
-        hk_exec("rsync -avx --delete /Users/santa/Archive/ /Volumes/Takaramono$/backup/archive/")
-        hk_exec("cp /Volumes/Takaramono$/backup/music/itunes_genuine_report.csv /Users/santa/Music")
-        hk_exec("rsync -avx --delete /Users/santa/Music/ /Volumes/Takaramono$/backup/music/")
-        hk_exec("rsync -avx --delete /Users/santa/Movies/ /Volumes/Takaramono$/backup/video/")
-        hk_exec("rsync -avx --delete '/Users/santa/Pictures/iPhoto Library/Masters/' /Volumes/Takaramono$/backup/iphoto_master/")
-        hk_exec("rsync -avx --delete /Users/santa/Manga/ /Volumes/Takaramono$/manga/")
-    else:
-        print "Backup folder /Volumes/Takaramono$ not mounted!"
+def hk_rsync_to_nayuta():
+    hk_exec("rsync  -avx --delete /Users/santa/Manga/ santa@nayuta:/stuff/Pandora/manga/")
+
 
 def hk_size_ftp_ls_lr():
     fpath = raw_input("Please provide the path of ls-lR file: ")
@@ -1550,7 +1542,7 @@ available commands:
     papers-find-ophan                  check if pdf is in papers folder but not in Papers library
     rm-all-gems                        remove all rubygems (currently Mac only)
     rm-empty-dir                       remove empty dir
-    rsync-to-labpc                     use rsync to backup my craps onto LabPC
+    rsync-to-nayuta                    use rsync to backup my craps onto backup server
     s3backup-iphoto                    use s3cmd to backup iphoto library to AWS
     size-ftp-ls-lr                     get the total size of an FTP site by its ls-lR file
     sync-rainlendar (deprecated)       sync iCal & rainlendar
@@ -1632,8 +1624,8 @@ if __name__ == "__main__":
         hk_rm_all_gems()
     elif sys.argv[1] == "rm-empty-dir":
         hk_rm_empty_dir()
-    elif sys.argv[1] == "rsync-to-labpc":
-        hk_rsync_to_labpc()
+    elif sys.argv[1] == "rsync-to-nayuta":
+        hk_rsync_to_nayuta()
     elif sys.argv[1] == "s3backup-iphoto":
         hk_s3backup_iphoto()
     elif sys.argv[1] == "size-ftp-ls-lr":
