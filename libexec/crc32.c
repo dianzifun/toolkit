@@ -82,6 +82,10 @@ int main(int argc, char *argv[]) {
   }
   while(--argc > 0) {
     errors |= crc32file(*++argv, &crc);
+    if (errors) {
+        fprintf(stderr, "failed to calculate crc32 for %s\n", *argv);
+        break;
+    }
     printf("%08X %s\n", crc, *argv);
   }
   return errors != 0;
