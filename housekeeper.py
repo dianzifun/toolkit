@@ -132,6 +132,7 @@ def hk_should_ignore_crc32(fname, ignore_pattern):
 def hk_write_crc32_walker(args, folder, files):
     if ".AppleDouble" in folder:
         write_log("[skip] dir: %s" % folder)
+        return
     crc32_bin, ignore_pattern, new_only = args
     write_log("[dir] %s" % folder)
     crc_f = None
