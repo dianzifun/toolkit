@@ -18,6 +18,7 @@ import zipfile
 import urllib2
 from urllib2 import HTTPError
 from utils import *
+from urllib2 import urlparse
 import fancycbz
 
 SOCKET_TIMEOUT = 30
@@ -55,6 +56,7 @@ available commands:
     check-origin [dir]   check origin manga server to check if manga archives are healthy
     download             download a manga book
     download-reverse     download a manga book, in reverse order
+    download-tieba       download from baidu tieba
     help                 display this help message
     list-library         list contents in library
     pack-all             packup all manga books
@@ -1096,6 +1098,40 @@ def mg_check_origin():
                     traceback.print_exc()
                     time.sleep(1)
 
+def mg_tieba():
+    url = "http://tieba.baidu.com/p/1511063133"
+    folder = "/Users/santa/Downloads/hi"
+    if os.path.exists(folder) == False:
+        os.makedirs(folder)
+    page_src = urllib2.urlopen(url).read()
+    idx = 0
+    cnt = 1
+    while True:
+        idx = page_src.find('src=', idx)
+        if idx < 0:
+            break
+        quot = page_src[idx + 4]
+        idx2 = page_src.find(quot, idx + 5)
+        try:
+            target = urlparse.urlparse(page_src[idx + 5:idx2])
+            if is_image(target.path):
+                target_url = target.scheme + "://" + target.netloc + target.path
+                print target_url
+                img_fn = os.path.basename(target.path)
+                local_fn = os.path.join(folder, "%03d-%s" % (cnt, img_fn))
+                print local_fn
+                try:
+                    tmp_f = open(local_fn + ".tmp", "wb")
+                    tmp_f.write(urllib2.urlopen(target_url).read())
+                    tmp_f.close()
+                    os.rename(local_fn + ".tmp", local_fn)
+                except:
+                    traceback.print_exc()
+                    time.sleep(1)
+                cnt += 1
+        finally:
+            idx = idx2
+
 
 def mang_serve():
     port = get_config("http_svr_port")
@@ -1118,6 +1154,8 @@ if __name__ == "__main__":
         mang_download()
     elif sys.argv[1] == "download-reverse":
         mang_download(reverse=True)
+    elif sys.argv[1] == "download-tieba":
+        mg_tieba()
     elif sys.argv[1] == "list-library":
         mang_list_library()
     elif sys.argv[1] == "pack-all":
