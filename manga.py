@@ -1099,8 +1099,8 @@ def mg_check_origin():
                     time.sleep(1)
 
 def mg_tieba():
-    url = "http://tieba.baidu.com/p/1511063133"
-    folder = "/Users/santa/Downloads/hi"
+    url = raw_input("teiba url? ")
+    folder = raw_input("download dir? ")
     if os.path.exists(folder) == False:
         os.makedirs(folder)
     page_src = urllib2.urlopen(url).read()
