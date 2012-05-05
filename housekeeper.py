@@ -1333,7 +1333,11 @@ def hk_timemachine_image():
     f.close()
 
 def hk_rsync_to_nayuta():
-    hk_exec("rsync  -avx --delete /Users/santa/Manga/ santa@nayuta:/stuff/Pandora/manga/")
+    manga_folder = get_config("manga.manga_folder")
+    if not manga_folder.endswith("/"):
+        manga_folder += "/"
+    cmd = "rsync  -avx --delete %s santa@nayuta:/stuff/Pandora/manga/" % manga_folder
+    hk_exec(cmd)
 
 
 def hk_size_ftp_ls_lr():

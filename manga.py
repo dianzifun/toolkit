@@ -1135,39 +1135,55 @@ def mg_tieba():
 
 def mang_serve():
     port = get_config("http_svr_port")
-    manga_folder = get_config("manga_folder")
+    manga_folder = MANGA_FOLDER
     os.chdir(manga_folder)
     os.system("python -m SimpleHTTPServer %s" % port)
+
+def ensure_manga_folder():
+    if os.path.exists(MANGA_FOLDER) == False:
+        print "manga folder '%s' not exists, quit now!" % MANGA_FOLDER
+        exit(1)
 
 if __name__ == "__main__":
     if len(sys.argv) == 1 or sys.argv[1] == "help":
         mang_print_help()
     elif sys.argv[1] == "check-corrupt":
+        ensure_manga_folder()
         mang_check_corrupt()
     elif sys.argv[1] == "check-cruft":
+        ensure_manga_folder()
         mg_check_cruft()
     elif sys.argv[1] == "check-missing":
+        ensure_manga_folder()
         mg_check_missing()
     elif sys.argv[1] == "check-origin":
+        ensure_manga_folder()
         mg_check_origin()
     elif sys.argv[1] == "download":
+        ensure_manga_folder()
         mang_download()
     elif sys.argv[1] == "download-reverse":
+        ensure_manga_folder()
         mang_download(reverse=True)
     elif sys.argv[1] == "download-tieba":
+        ensure_manga_folder()
         mg_tieba()
     elif sys.argv[1] == "list-library":
         mang_list_library()
     elif sys.argv[1] == "pack-all":
+        ensure_manga_folder()
         mang_pack_all()
     elif sys.argv[1] == "server":
+        ensure_manga_folder()
         mang_serve()
     elif sys.argv[1] == "stat":
+        ensure_manga_folder()
         mg_stat()
     elif sys.argv[1] == "update":
+        ensure_manga_folder()
         mang_update()
     elif sys.argv[1] == "update-all":
+        ensure_manga_folder()
         mang_update_all()
     else:
         print "command '%s' not understood, see 'manga.py help' for more info" % sys.argv[1]
-
