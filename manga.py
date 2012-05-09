@@ -171,7 +171,12 @@ def mg_check_missing():
             fpath = os.path.join(root, fn)
             if not fpath.lower().endswith(".zip"):
                 continue
-            zf = ZipFile(fpath)
+            zf = None
+            try:
+                zf = ZipFile(fpath)
+            except:
+                write_log("[failure] error opening zip file: '%s'" % fpath)
+                continue
             all_nums = set()
             page_nums = set()
             for zinfo in zf.infolist():
