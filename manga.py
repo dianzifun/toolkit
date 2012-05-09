@@ -83,7 +83,12 @@ def mg_stat():
             this_img_cnt = 0
             zip_cnt += 1
             zip_total_size += os.stat(fpath).st_size
-            zf = ZipFile(fpath)
+            zf = None
+            try:
+                zf = ZipFile(fpath)
+            except:
+                write_log("[failure] failed to open zip file: '%s'" % fpath)
+                continue
             for zinfo in zf.infolist():
                 if is_image(zinfo.filename):
                     img_cnt += 1
