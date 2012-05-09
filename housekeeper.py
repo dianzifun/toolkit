@@ -1273,7 +1273,7 @@ def hk_sys_maint():
 
 def hk_backup_evernote():
     print "Running backup for Evernote..."
-    os.chdir("/Users/santa/Library/Application Support/Evernote/data")
+    os.chdir("/Users/santa/Library/Application Support/Evernote/accounts/Evernote/santazhang/content")
     os.system("git ls-files -d -z | xargs -0 git rm")
     os.system('git add . ; git commit -am "backup on %s"' % time.asctime())
     os.system("git gc --aggressive --prune; git push --all")
