@@ -863,7 +863,7 @@ def hk_backup_psp():
     tmp_folder = get_config("tmp_folder")
     psp_root = get_config("psp_root")
     bkup_folder = os.path.join(get_config("dropbox_folder"), "Backups")
-    bkup_job_name = "nds_backup.%s" % (time.strftime("%y%m%d-%H%M%S", time.localtime()))
+    bkup_job_name = "psp_backup.%s" % (time.strftime("%y%m%d-%H%M%S", time.localtime()))
     tmp_cp_folder = os.path.join(tmp_folder, bkup_job_name)
     hk_make_dirs(tmp_cp_folder)
     tmp_savedata_dir = os.path.join(tmp_cp_folder, "PSP", "SAVEDATA")
