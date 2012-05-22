@@ -844,17 +844,70 @@ def mang_list_library():
     print "%d items in library" % len(library)
 
 
+def bin_to_str(magic):
+    l = []
+    for m in magic:
+        l += "%02x" % ord(m),
+    return " ".join(l)
+
+def my_zip_img_check(the_zip_file):
+    for info in the_zip_file.infolist():
+#        print info.filename, info.file_size
+        # consider 4KB a threshold of small files
+        if info.filename.endswith("/"):
+            # folder
+            continue
+        if info.file_size < 4096 and is_image(info.filename):
+            write_log("[corrupt] Possibly broken file (too small) '%s', size=%d" % (info.filename, info.file_size))
+            return info.filename
+        if not is_image(info.filename):
+            continue
+        # check if bad image
+        ret = None
+        zf = the_zip_file.open(info.filename, 'r')
+        lower_fn = info.filename.lower()
+        if lower_fn.endswith(".png"):
+            magic = zf.read(4)
+            if magic[1:4] != "PNG":
+                ret = info.filename
+                write_log("[corrupt] Possibly broken PNG: '%s', magic='%s'" % (info.filename, bin_to_str(magic)))
+        if lower_fn.endswith(".gif"):
+            magic = zf.read(4)
+            if magic[0:3] != "GIF":
+                ret = info.filename
+                write_log("[corrupt] Possibly broken GIF: '%s', magic='%s'" % (info.filename, bin_to_str(magic)))
+        if lower_fn.endswith(".jpg") or lower_fn.endswith(".jpeg"):
+            zf.read(6)
+            magic = zf.read(4)
+            if not (magic == "JFIF" or magic == "Exif"):
+                ret = info.filename
+                write_log("[corrupt] Possibly broken JPEG: '%s', magic='%s'" % (info.filename, bin_to_str(magic)))
+        zf.close()
+        return ret
+    return None
+
+
 def util_check_corrupt_zip():
     tmp_folder = get_config("tmp_folder")
     print "tmp folder:", tmp_folder
     bad_list = []
     for root, dirnames, fnames in os.walk(MANGA_FOLDER):
         for fn in fnames:
+            if fn.startswith("."):
+                continue
             fpath = os.path.join(root, fn)
             if fpath.lower().endswith(".zip"):
                 print "checking zip file:", fpath
-                the_zip_file = ZipFile(fpath)
+                the_zip_file = None
+                try:
+                    the_zip_file = ZipFile(fpath)
+                except:
+                    traceback.print_exc()
+                    bad_list += (fpath, ret),
+                    continue
                 ret = the_zip_file.testzip()
+                if ret == None:
+                    ret = my_zip_img_check(the_zip_file)
                 if ret is not None:
                     try:
                         print "*** first bad file in zip: %s" % ret
