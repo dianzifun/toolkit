@@ -877,9 +877,8 @@ def my_zip_img_check(the_zip_file):
                 ret = info.filename
                 write_log("[corrupt] Possibly broken GIF: '%s', magic='%s'" % (info.filename, bin_to_str(magic)))
         if lower_fn.endswith(".jpg") or lower_fn.endswith(".jpeg"):
-            zf.read(6)
-            magic = zf.read(4)
-            if not (magic == "JFIF" or magic == "Exif"):
+            magic = zf.read(10)
+            if not (magic[6:10] == "JFIF" or magic[6:10] == "Exif"):
                 ret = info.filename
                 write_log("[corrupt] Possibly broken JPEG: '%s', magic='%s'" % (info.filename, bin_to_str(magic)))
         zf.close()
