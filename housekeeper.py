@@ -866,7 +866,7 @@ def hk_backup_psp():
     tmp_folder = get_config("tmp_folder")
     psp_root = get_config("psp_root")
     bkup_folder = os.path.join(get_config("dropbox_folder"), "Backups")
-    bkup_job_name = "nds_backup.%s" % (time.strftime("%y%m%d-%H%M%S", time.localtime()))
+    bkup_job_name = "psp_backup.%s" % (time.strftime("%y%m%d-%H%M%S", time.localtime()))
     tmp_cp_folder = os.path.join(tmp_folder, bkup_job_name)
     hk_make_dirs(tmp_cp_folder)
     tmp_savedata_dir = os.path.join(tmp_cp_folder, "PSP", "SAVEDATA")
@@ -1276,7 +1276,7 @@ def hk_sys_maint():
 
 def hk_backup_evernote():
     print "Running backup for Evernote..."
-    os.chdir("/Users/santa/Library/Application Support/Evernote/data")
+    os.chdir("/Users/santa/Library/Application Support/Evernote/accounts/Evernote/santazhang/content")
     os.system("git ls-files -d -z | xargs -0 git rm")
     os.system('git add . ; git commit -am "backup on %s"' % time.asctime())
     os.system("git gc --aggressive --prune; git push --all")
@@ -1335,17 +1335,13 @@ def hk_timemachine_image():
     </plist>""" % uuid)
     f.close()
 
-def hk_rsync_to_labpc():
-    if os.path.exists("/Volumes/Takaramono$"):
-        print "Backing up to /Volumes/Takaramono$"
-        hk_exec("rsync -avx --delete /Users/santa/Archive/ /Volumes/Takaramono$/backup/archive/")
-        hk_exec("cp /Volumes/Takaramono$/backup/music/itunes_genuine_report.csv /Users/santa/Music")
-        hk_exec("rsync -avx --delete /Users/santa/Music/ /Volumes/Takaramono$/backup/music/")
-        hk_exec("rsync -avx --delete /Users/santa/Movies/ /Volumes/Takaramono$/backup/video/")
-        hk_exec("rsync -avx --delete '/Users/santa/Pictures/iPhoto Library/Masters/' /Volumes/Takaramono$/backup/iphoto_master/")
-        hk_exec("rsync -avx --delete /Users/santa/Manga/ /Volumes/Takaramono$/manga/")
-    else:
-        print "Backup folder /Volumes/Takaramono$ not mounted!"
+def hk_rsync_to_nayuta():
+    manga_folder = get_config("manga.manga_folder")
+    if not manga_folder.endswith("/"):
+        manga_folder += "/"
+    cmd = "rsync  -avx --delete %s santa@nayuta:/stuff/Pandora/manga/" % manga_folder
+    hk_exec(cmd)
+
 
 def hk_size_ftp_ls_lr():
     fpath = raw_input("Please provide the path of ls-lR file: ")
@@ -1553,7 +1549,7 @@ available commands:
     papers-find-ophan                  check if pdf is in papers folder but not in Papers library
     rm-all-gems                        remove all rubygems (currently Mac only)
     rm-empty-dir                       remove empty dir
-    rsync-to-labpc                     use rsync to backup my craps onto LabPC
+    rsync-to-nayuta                    use rsync to backup my craps onto backup server
     s3backup-iphoto                    use s3cmd to backup iphoto library to AWS
     size-ftp-ls-lr                     get the total size of an FTP site by its ls-lR file
     sync-rainlendar (deprecated)       sync iCal & rainlendar
@@ -1635,8 +1631,8 @@ if __name__ == "__main__":
         hk_rm_all_gems()
     elif sys.argv[1] == "rm-empty-dir":
         hk_rm_empty_dir()
-    elif sys.argv[1] == "rsync-to-labpc":
-        hk_rsync_to_labpc()
+    elif sys.argv[1] == "rsync-to-nayuta":
+        hk_rsync_to_nayuta()
     elif sys.argv[1] == "s3backup-iphoto":
         hk_s3backup_iphoto()
     elif sys.argv[1] == "size-ftp-ls-lr":

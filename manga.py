@@ -18,6 +18,7 @@ import zipfile
 import urllib2
 from urllib2 import HTTPError
 from utils import *
+from urllib2 import urlparse
 import fancycbz
 
 SOCKET_TIMEOUT = 30
@@ -55,6 +56,7 @@ available commands:
     check-origin [dir]   check origin manga server to check if manga archives are healthy
     download             download a manga book
     download-reverse     download a manga book, in reverse order
+    download-tieba       download from baidu tieba
     help                 display this help message
     list-library         list contents in library
     pack-all             packup all manga books
@@ -81,7 +83,12 @@ def mg_stat():
             this_img_cnt = 0
             zip_cnt += 1
             zip_total_size += os.stat(fpath).st_size
-            zf = ZipFile(fpath)
+            zf = None
+            try:
+                zf = ZipFile(fpath)
+            except:
+                write_log("[failure] failed to open zip file: '%s'" % fpath)
+                continue
             for zinfo in zf.infolist():
                 if is_image(zinfo.filename):
                     img_cnt += 1
@@ -169,7 +176,12 @@ def mg_check_missing():
             fpath = os.path.join(root, fn)
             if not fpath.lower().endswith(".zip"):
                 continue
-            zf = ZipFile(fpath)
+            zf = None
+            try:
+                zf = ZipFile(fpath)
+            except:
+                write_log("[failure] error opening zip file: '%s'" % fpath)
+                continue
             all_nums = set()
             page_nums = set()
             for zinfo in zf.infolist():
@@ -832,17 +844,69 @@ def mang_list_library():
     print "%d items in library" % len(library)
 
 
+def bin_to_str(magic):
+    l = []
+    for m in magic:
+        l += "%02x" % ord(m),
+    return " ".join(l)
+
+def my_zip_img_check(the_zip_file):
+    for info in the_zip_file.infolist():
+#        print info.filename, info.file_size
+        # consider 4KB a threshold of small files
+        if info.filename.endswith("/"):
+            # folder
+            continue
+        if info.file_size < 4096 and is_image(info.filename):
+            write_log("[corrupt] Possibly broken file (too small) '%s', size=%d" % (info.filename, info.file_size))
+            return info.filename
+        if not is_image(info.filename):
+            continue
+        # check if bad image
+        ret = None
+        zf = the_zip_file.open(info.filename, 'r')
+        lower_fn = info.filename.lower()
+        if lower_fn.endswith(".png"):
+            magic = zf.read(4)
+            if magic[1:4] != "PNG":
+                ret = info.filename
+                write_log("[corrupt] Possibly broken PNG: '%s', magic='%s'" % (info.filename, bin_to_str(magic)))
+        if lower_fn.endswith(".gif"):
+            magic = zf.read(4)
+            if magic[0:3] != "GIF":
+                ret = info.filename
+                write_log("[corrupt] Possibly broken GIF: '%s', magic='%s'" % (info.filename, bin_to_str(magic)))
+        if lower_fn.endswith(".jpg") or lower_fn.endswith(".jpeg"):
+            magic = zf.read(10)
+            if not (magic[6:10] == "JFIF" or magic[6:10] == "Exif" or magic[6:10] == "Phot"):
+                ret = info.filename
+                write_log("[corrupt] Possibly broken JPEG: '%s', magic='%s'" % (info.filename, bin_to_str(magic)))
+        zf.close()
+        return ret
+    return None
+
+
 def util_check_corrupt_zip():
     tmp_folder = get_config("tmp_folder")
     print "tmp folder:", tmp_folder
     bad_list = []
     for root, dirnames, fnames in os.walk(MANGA_FOLDER):
         for fn in fnames:
+            if fn.startswith("."):
+                continue
             fpath = os.path.join(root, fn)
             if fpath.lower().endswith(".zip"):
                 print "checking zip file:", fpath
-                the_zip_file = ZipFile(fpath)
+                the_zip_file = None
+                try:
+                    the_zip_file = ZipFile(fpath)
+                except:
+                    traceback.print_exc()
+                    bad_list += (fpath, ret),
+                    continue
                 ret = the_zip_file.testzip()
+                if ret == None:
+                    ret = my_zip_img_check(the_zip_file)
                 if ret is not None:
                     try:
                         print "*** first bad file in zip: %s" % ret
@@ -1096,40 +1160,92 @@ def mg_check_origin():
                     traceback.print_exc()
                     time.sleep(1)
 
+def mg_tieba():
+    url = raw_input("teiba url? ")
+    folder = raw_input("download dir? ")
+    if os.path.exists(folder) == False:
+        os.makedirs(folder)
+    page_src = urllib2.urlopen(url).read()
+    idx = 0
+    cnt = 1
+    while True:
+        idx = page_src.find('src=', idx)
+        if idx < 0:
+            break
+        quot = page_src[idx + 4]
+        idx2 = page_src.find(quot, idx + 5)
+        try:
+            target = urlparse.urlparse(page_src[idx + 5:idx2])
+            if is_image(target.path):
+                target_url = target.scheme + "://" + target.netloc + target.path
+                print target_url
+                img_fn = os.path.basename(target.path)
+                local_fn = os.path.join(folder, "%03d-%s" % (cnt, img_fn))
+                print local_fn
+                try:
+                    tmp_f = open(local_fn + ".tmp", "wb")
+                    tmp_f.write(urllib2.urlopen(target_url).read())
+                    tmp_f.close()
+                    os.rename(local_fn + ".tmp", local_fn)
+                except:
+                    traceback.print_exc()
+                    time.sleep(1)
+                cnt += 1
+        finally:
+            idx = idx2
+
 
 def mang_serve():
     port = get_config("http_svr_port")
-    manga_folder = get_config("manga_folder")
+    manga_folder = MANGA_FOLDER
     os.chdir(manga_folder)
     os.system("python -m SimpleHTTPServer %s" % port)
+
+def ensure_manga_folder():
+    if os.path.exists(MANGA_FOLDER) == False:
+        print "manga folder '%s' not exists, quit now!" % MANGA_FOLDER
+        exit(1)
 
 if __name__ == "__main__":
     if len(sys.argv) == 1 or sys.argv[1] == "help":
         mang_print_help()
     elif sys.argv[1] == "check-corrupt":
+        ensure_manga_folder()
         mang_check_corrupt()
     elif sys.argv[1] == "check-cruft":
+        ensure_manga_folder()
         mg_check_cruft()
     elif sys.argv[1] == "check-missing":
+        ensure_manga_folder()
         mg_check_missing()
     elif sys.argv[1] == "check-origin":
+        ensure_manga_folder()
         mg_check_origin()
     elif sys.argv[1] == "download":
+        ensure_manga_folder()
         mang_download()
     elif sys.argv[1] == "download-reverse":
+        ensure_manga_folder()
         mang_download(reverse=True)
+    elif sys.argv[1] == "download-tieba":
+        ensure_manga_folder()
+        mg_tieba()
     elif sys.argv[1] == "list-library":
         mang_list_library()
     elif sys.argv[1] == "pack-all":
+        ensure_manga_folder()
         mang_pack_all()
     elif sys.argv[1] == "server":
+        ensure_manga_folder()
         mang_serve()
     elif sys.argv[1] == "stat":
+        ensure_manga_folder()
         mg_stat()
     elif sys.argv[1] == "update":
+        ensure_manga_folder()
         mang_update()
     elif sys.argv[1] == "update-all":
+        ensure_manga_folder()
         mang_update_all()
     else:
         print "command '%s' not understood, see 'manga.py help' for more info" % sys.argv[1]
-

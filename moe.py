@@ -789,6 +789,9 @@ def moe_import():
     info_folder = raw_input("info folder: ")
 
     def import_walker(info_folder, dir, files):
+        if os.path.basename(dir).startswith("."):
+            print "[skip] skip path: %s" % dir
+            return
         for file in files:
             fpath = dir + os.path.sep + file
             if util_is_image(fpath) == False:
@@ -946,6 +949,9 @@ def moe_import_rating_psp():
         has_highres = True
 
     def import_walker(arg, dir, files):
+        if os.path.basename(dir).startswith("."):
+            print "[skip] skip path: %s" % dir
+            return
         print "working on dir: %s" % dir
         for file in files:
             if file.lower().endswith(".txt") == False:
@@ -1364,6 +1370,9 @@ def moe_find_ophan():
 
     ophan_list = []
     def find_ophan_walker(ophan_list, dir, files):
+        if os.path.basename(dir).startswith("."):
+            print "[skip] skip dir: %s" % dir
+            return
         print "working in dir: %s" % dir
         for file in files:
             if util_is_image(file) == False:
@@ -1515,6 +1524,9 @@ def moe_add_dir_tree():
     tag_list = tags.split()
     walker_args = [id_in_set, []]
     def add_dir_tree_walker(walker_args, dir, files):
+        if os.path.basename(dir).startswith("."):
+            print "[skip] skip path: %s" % dir
+            return
         print "working in dir: %s" % dir
         for file in files:
             fpath = dir + os.path.sep + file

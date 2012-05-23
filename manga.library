@@ -8,6 +8,18 @@
 #
 # there is empty lines between manga books
 
+name=kongdeliya
+url=http://manhua.178.com/kongdeliya/
+
+name=arari
+url=http://manhua.178.com/all/
+
+name=shadow_lady
+url=http://manhua.178.com/ygsnhynsyzsn/
+
+name=guizhenghe
+url=http://manhua.178.com/gzhjzjxj/
+
 name=ranxuehongye
 url=http://manhua.178.com/ranxuehongye/
 
@@ -82,8 +94,8 @@ url=http://manhua.178.com/wlrj/
 name=gantz_178
 url=http://manhua.178.com/sldsgantz/
 
-#name=mayochiki
-#url=http://manhua.178.com/mmgjynrdw/
+name=mayochiki
+url=http://manhua.178.com/mmgjynrdw/
 
 #name=inukami
 #url=http://manhua.178.com/qs/
@@ -137,8 +149,8 @@ url=http://manhua.178.com/mowangyongzhejujue/
 name=wearestillalive
 url=http://manhua.178.com/womendouhaihuozhe/
 
-#name=lddwj
-#url=http://manhua.178.com/lddwanju/
+name=lddwj
+url=http://manhua.178.com/lddwanju/
 
 name=goodending
 url=http://manhua.178.com/ge-good-ending/
