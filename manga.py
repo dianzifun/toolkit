@@ -922,7 +922,10 @@ def util_check_corrupt_zip():
     else:
         print "*** corruption found:"
         for bad in bad_list:
-            print "%s, %s" % (bad[0], bad[1])
+            try:
+                print "%s, %s" % (bad[0], bad[1])
+            except:
+                traceback.print_exc()
 
 
 # used in util_check_corrupt_images_in_zip, wrap binary as a file object for PIL
