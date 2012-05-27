@@ -1450,9 +1450,9 @@ def hk_tunet_status():
     output = p.read()
     p.close()
     lines = output.split("\n")
-    update_stat("month in", lines[60].strip()[19:-5])
-    update_stat("month out", lines[61].strip()[19:-5])
-    update_stat("transfer cost", lines[65].strip()[19:-5])
+    update_stat("month in", lines[66].strip()[19:-5])
+    update_stat("month out", lines[67].strip()[19:-5])
+    update_stat("transfer cost", lines[71].strip()[19:-5])
 
     for k in ["user id", "login time", "current ip", "current in", "current out", "month in", "month out", "transfer cost", "balance"]:
         if stat_info.has_key(k):
