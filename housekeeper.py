@@ -1516,6 +1516,64 @@ def hk_nds_ls(nds_game_dir):
         f.close()
         print "%s id='%s' fn='%s'" % (game_finger, game_id, fn)
 
+
+def hk_lslr2du():
+    print "usage: housekeeper.py lslr2du <ls-lR file> [prefix] [depth]"
+    if len(sys.argv) < 3:
+        return
+    f = open(sys.argv[2])
+    dumap = {}
+    while True:
+        line = f.readline()
+        if line == "":
+            break
+        path = line.strip().strip(":")
+        print "analyzing: %s" % path
+        f.readline() # skip a line ('total xxx')
+        while True:
+            line = f.readline().strip()
+            if line == "":
+                break
+            sz_str = line.split()[4]
+            if "," in sz_str:
+                continue # device major num
+            sz = int(sz_str)
+            p = path
+            while True:
+                if dumap.has_key(p):
+                    dumap[p] += sz
+                else:
+                    dumap[p] = sz
+                q = os.path.split(p)[0]
+                if q == p:
+                    break
+                else:
+                    p = q
+    f.close()
+    print "=== done analyzing ==="
+    if len(sys.argv) >= 4:
+        prefix = sys.argv[3]
+        if prefix != "/" and prefix.endswith("/"):
+            prefix = prefix[:-1]
+    else:
+        prefix = ""
+    if len(sys.argv) >= 5:
+        depth = int(sys.argv[4])
+    else:
+        depth = 1024 * 1024 # sentinel
+    allpath = dumap.keys()
+    allpath.sort()
+    for p in allpath:
+        if not p.startswith(prefix):
+            continue
+        q = p[len(prefix):]
+        if q == "/":
+            d = 0
+        else:
+            d = len(q.split("/")) - 1
+        if d <= depth:
+            print "%-10s %s" % (pretty_fsize(dumap[p]), p)
+
 def hk_help():
     print """housekeeper.py: helper script to manage my important collections
 usage: housekeeper.py <command>
@@ -1544,6 +1602,7 @@ available commands:
     itunes-stats                       display iTunes library info
     jpeg2jpg                           convert .jpeg ext name to .jpg
     lowercase-ext                      make sure file extensions are lower case
+    lslr2du                            convert ls -lR output to du like output
     nds-ls                             list NDS games info
     psp-sync-pic                       sync images to psp
     papers-find-ophan                  check if pdf is in papers folder but not in Papers library
@@ -1618,6 +1677,8 @@ if __name__ == "__main__":
         hk_jpeg2jpg()
     elif sys.argv[1] == "lowercase-ext":
         hk_lowercase_ext()
+    elif sys.argv[1] == "lslr2du":
+        hk_lslr2du()
     elif sys.argv[1] == "nds-ls":
         if len(sys.argv) < 3:
             print "usage: housekeeper.py nds-ls <nds-game-dir>"
