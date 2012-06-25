@@ -8,6 +8,9 @@
 #
 # there is empty lines between manga books
 
+name=wdpy_shobon
+url=http://manhua.178.com/wdpyhsshobon/
+
 name=youlita
 url=http://manhua.178.com/youlita/
 
