@@ -8,6 +8,12 @@
 #
 # there is empty lines between manga books
 
+name=chaoyuhu
+url=http://manhua.178.com/chaoyuhu/
+
+name=mfsnyly
+url=http://manhua.178.com/mfsnyly/
+
 name=wdpy_shobon
 url=http://manhua.178.com/wdpyhsshobon/
 
