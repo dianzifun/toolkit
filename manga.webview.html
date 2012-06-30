@@ -1,0 +1,63 @@
+<html>
+<head>
+  <title><%title%></title>
+</head>
+
+
+<script type="text/javascript">
+var img_list = <%img_list%>;
+var page_id = 0;
+</script>
+
+<style type='text/css'>
+img {
+  height: 95%;
+}
+</style>
+
+<body style='width: 100%; hegiht: 100%'>
+  <a href='<%last_book_href%>'>LAST BOOK: <%last_book_name%></a> ..................
+  <a href='<%book_dir_href%>'>BOOK DIR</a> ....................
+  <a href='<%next_book_href%>'>NEXT BOOK: <%next_book_name%></a>
+  <div>
+  <script type="text/javascript">
+  document.write("<img id='the_image' src=\'<%book_path%>?img_fn=" + img_list[page_id] + "\'/>");
+  </script>
+  </div>
+  
+  <a href='#' onclick='last_page()'>LAST PAGE</a> ..................
+  <script type="text/javascript">
+  document.write("<select>");
+  for (var i = 0; i < img_list.length; i++) {
+    document.write("<option>" + img_list[i] + "</option>\n");
+  }
+  document.write("</select>");
+  </script>
+  ..................
+  <a href='#' onclick='next_page()'>NEXT PAGE</a>
+  
+  <script type="text/javascript">
+  
+  function next_page() {
+    if (page_id == img_list.length - 1) {
+      alert("already last page!");
+      return;
+    }
+    page_id += 1;
+    the_image.src = "<%book_path%>?img_fn=" + img_list[page_id];
+  }
+  
+  function last_page() {
+    if (page_id == 0) {
+      alert("already first page!");
+      return;
+    }
+    page_id -= 1;
+    the_image.src = "<%book_path%>?img_fn=" + img_list[page_id];
+  }
+  
+  the_image.onclick = function() {next_page()};
+  </script>
+</body>
+
+</html>

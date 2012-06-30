@@ -1209,6 +1209,132 @@ def ensure_manga_folder():
         print "manga folder '%s' not exists, quit now!" % MANGA_FOLDER
         exit(1)
 
+def mg_webview():
+    try:
+        import tornado.ioloop
+        import tornado.web
+        import urllib
+        import cgi
+    except:
+        print "tornado web server not installed! quit now!"
+        return
+
+    f = open(os.path.join(os.path.dirname(__file__), "manga.webview.html"))
+    webview_template = f.read()
+    f.close()
+
+    class MangaHandler(tornado.web.RequestHandler):
+        def get_fs_path(self, req_path):
+            splt = req_path.split('/')
+            p = ''
+            for seg in splt:
+                seg = urllib.unquote(seg)
+                if seg != '':
+                    if p == '':
+                        p = seg
+                    else:
+                        p = p + os.path.sep + seg
+            fs_path = os.path.join(MANGA_FOLDER, p)
+            return fs_path
+
+        def render_dir(self, fs_path):
+            if self.request.path != '/':
+                self.write("<a href='..'>Parent Dir</a>\n")
+            self.write("<ul>\n")
+            fn_list = os.listdir(fs_path)
+            fn_list.sort()
+            for fn in fn_list:
+                if fn.startswith("."):
+                    continue
+                if fn == "download_from.txt" or fn == "housekeeper.crc32":
+                    continue
+                if self.request.path.endswith("/"):
+                    sub_link = self.request.path + fn
+                else:
+                    sub_link = self.request.path + "/" + fn
+                self.write("  <li><a href='%s'>" % sub_link)
+                self.write(cgi.escape(fn))
+                self.write("</a></li>\n")
+            self.write("</ul>\n")
+
+        def get_zip_pic_list(self, zip_fpath):
+            pic_lst = []
+            with ZipFile(zip_fpath, 'r') as zf:
+                for zi in zf.infolist():
+                    zi_lower = zi.filename.lower()
+                    if zi_lower.endswith(".jpg") or zi_lower.endswith(".jpeg") or zi_lower.endswith(".png"):
+                        pic_lst += zi.filename,
+            pic_lst.sort()
+            return pic_lst
+
+
+        def render_book(self, fs_path):
+            img_fn = self.get_argument('img_fn', '')
+            if img_fn == '':
+                # viewer page
+                html = webview_template
+                html = html.replace("<%img_list%>", repr(self.get_zip_pic_list(fs_path)))
+                book_fn = fs_path.split(os.path.sep)[-1]
+                html = html.replace("<%title%>", book_fn)
+                html = html.replace("<%book_path%>", self.request.path)
+                book_dir = "/".join(self.request.path.split("/")[:-1])
+                html = html.replace("<%book_dir_href%>", book_dir)
+                last_book_name = ""
+                next_book_name = ""
+                fn_list = os.listdir(os.path.dirname(fs_path))
+                fn_list.sort()
+                book_list = []
+                for fn in fn_list:
+                    if fn.endswith(".zip"):
+                        book_list += fn,
+                idx = book_list.index(book_fn)
+                if idx - 1 >= 0:
+                    last_book_name = book_list[idx - 1]
+                if idx + 1 < len(book_list):
+                    next_book_name = book_list[idx + 1]
+                html = html.replace("<%last_book_name%>", last_book_name)
+                html = html.replace("<%last_book_href%>", book_dir + "/" + last_book_name)
+                html = html.replace("<%next_book_name%>", next_book_name)
+                html = html.replace("<%next_book_href%>", book_dir + "/" + next_book_name)
+                self.write(html)
+            else:
+                # image blob
+                with ZipFile(fs_path, "r") as zf:
+                    lower_fn = img_fn.lower()
+                    if lower_fn.endswith(".jpg") or lower_fn.endswith(".jpeg"):
+                        self.add_header("Content-Type", "image/jpeg")
+                    elif lower_fn.endswith(".png"):
+                        self.add_header("Content-Type", "image/png")
+                    self.write(zf.open(img_fn).read())
+
+
+        def get(self):
+            fs_path = self.get_fs_path(self.request.path)
+            if not fs_path.startswith(MANGA_FOLDER):
+                self.send_error(403)
+                return
+            if not os.path.exists(fs_path):
+                self.send_error(404)
+            elif os.path.isdir(fs_path):
+                self.render_dir(fs_path)
+            elif fs_path.lower().endswith(".zip"):
+                # render manga
+                self.render_book(fs_path)
+            else:
+                # not supported
+                self.send_error(416) # bad media type
+
+
+    application = tornado.web.Application([
+        (r".*", MangaHandler),
+    ])
+
+    webview_port = int(get_config("webview_port"))
+    print "webview server running on port %d" % webview_port
+    application.listen(webview_port)
+    tornado.ioloop.IOLoop.instance().start()
+
+
 if __name__ == "__main__":
     if len(sys.argv) == 1 or sys.argv[1] == "help":
         mang_print_help()
@@ -1250,5 +1376,8 @@ if __name__ == "__main__":
     elif sys.argv[1] == "update-all":
         ensure_manga_folder()
         mang_update_all()
+    elif sys.argv[1] == "webview":
+        ensure_manga_folder()
+        mg_webview()
     else:
         print "command '%s' not understood, see 'manga.py help' for more info" % sys.argv[1]
