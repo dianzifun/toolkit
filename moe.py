@@ -41,6 +41,8 @@ DB_CONN = None
 g_image_root = None
 g_tmp_folder = None
 
+g_highres_confirm = False
+
 
 def init_db_connection():
     global SQLITE3_DB
@@ -503,11 +505,13 @@ def util_mirror_danbooru_site_down_image(info_list, image_set_base, image_set_hi
             time.sleep(1)
 
 def util_mirror_danbooru_site_html(site_url):
-    if "--skip-highres" not in sys.argv:
+    global g_highres_confirm
+    if "--skip-highres" not in sys.argv and g_highres_confirm == False:
         print "*** --skip-highres not specified in command line!"
         print "*** if you are sure you need highres images, press ENTER to continue"
         print "*** otherwise, Ctrl-C to quit"
         raw_input()
+        g_highres_confirm = True
     SOCKET_TIMEOUT = 30
     socket.setdefaulttimeout(SOCKET_TIMEOUT)
     tmp_folder = g_tmp_folder
@@ -602,11 +606,13 @@ def util_mirror_danbooru_site_html(site_url):
             time.sleep(1)
 
 def util_mirror_danbooru_site(site_url):
-    if "--skip-highres" not in sys.argv:
+    global g_highres_confirm
+    if "--skip-highres" not in sys.argv and g_highres_confirm == False:
         print "*** --skip-highres not specified in command line!"
         print "*** if you are sure you need highres images, press ENTER to continue"
         print "*** otherwise, Ctrl-C to quit"
         raw_input()
+        g_highres_confirm = True
     SOCKET_TIMEOUT = 30
     socket.setdefaulttimeout(SOCKET_TIMEOUT)
     tmp_folder = g_tmp_folder
@@ -687,11 +693,13 @@ def util_mirror_danbooru_site(site_url):
 
 # mirror danbooru main site, which only has html access for page >= 1000
 def util_mirror_danbooru_site_ex(site_url, before_id = None):
-    if "--skip-highres" not in sys.argv:
+    global g_highres_confirm
+    if "--skip-highres" not in sys.argv and g_highres_confirm == False:
         print "*** --skip-highres not specified in command line!"
         print "*** if you are sure you need highres images, press ENTER to continue"
         print "*** otherwise, Ctrl-C to quit"
         raw_input()
+        g_highres_confirm = True
     SOCKET_TIMEOUT = 30
     socket.setdefaulttimeout(SOCKET_TIMEOUT)
     tmp_folder = g_tmp_folder
