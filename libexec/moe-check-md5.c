@@ -503,11 +503,18 @@ int get_file_md5_text(char* fn, char* text) {
   return 0;
 }
 
+#if defined(__linux__) || defined(__APPLE__)
+#define PATH_SEP "/"
+#else
+#define PATH_SEP "\\"
+#endif
+
 int check_dir_md5(char* dirpath) {
   printf("check dir: %s\n", dirpath);
   char* md5fn = (char *) malloc(strlen(dirpath) + 20);
   strcpy(md5fn, dirpath);
-  strcat(md5fn, "\\md5sum.txt");
+  strcat(md5fn, PATH_SEP);
+  strcat(md5fn, "md5sum.txt");
   printf("md5 file: %s\n", md5fn);
   FILE* md5fp = fopen(md5fn, "r");
   if (md5fp == NULL) {
@@ -526,7 +533,7 @@ int check_dir_md5(char* dirpath) {
       fscanf(md5fp, "%s", short_fn);
       //printf(">> %s %s\n", md5, short_fn);
       strcpy(fn, dirpath);
-      strcat(fn, "\\");
+      strcat(fn, PATH_SEP);
       strcat(fn, short_fn);
       get_file_md5_text(fn, md5calc);
       if (strcmp(md5, md5calc) != 0) {
