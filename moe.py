@@ -41,6 +41,8 @@ DB_CONN = None
 g_image_root = None
 g_tmp_folder = None
 
+g_highres_confirm = False
+
 
 def init_db_connection():
     global SQLITE3_DB
@@ -52,7 +54,8 @@ def init_db_connection():
 
     # read basic config data
     g_image_root = get_config("image_root")
-    g_tmp_folder = get_config("tmp_folder")
+    g_tmp_folder = os.path.join(g_image_root, "_tmp")
+    util_make_dirs(g_tmp_folder)
 
     if os.path.exists(SQLITE3_DB) == False:
         print "[warning] database file '%s' not exist, will create new file!" % SQLITE3_DB
@@ -451,6 +454,12 @@ def util_download_danbooru_image(image_set, id_in_set, image_url, image_size = 0
         traceback.print_exc()
         time.sleep(1)
 
+
+# A few notes about "--skip-highres"
+# It's OK to download lowres images first, then run "moe.py mirror-xyz" again to download the highres
+# images. Skipping image by MD5 will not drop highres images by accident. This is because when downloading
+# lowres images, only lowres MD5 are recorded. For highres images, their MD5 is missing. And since
+# danbooru sites only provide MD5 of highres images, this means we won't skip highres images by mistake.
 def util_mirror_danbooru_site_down_image(info_list, image_set_base, image_set_highres, tmp_folder):
     for info in info_list:
         try:
@@ -461,6 +470,7 @@ def util_mirror_danbooru_site_down_image(info_list, image_set_base, image_set_hi
             if db_image_in_black_list_md5(info[u"md5"]):
                 print "[skip] '%s %d' is in black list (checked by md5)" % (image_set_base, id_in_set)
                 continue
+            # checking duplicated image by MD5 will not skip highres images by mistake, see notes above
             if db_get_image_by_md5(info[u"md5"]) != None:
                 print "[skip] '%s %d' has duplicated md5" % (image_set_base, id_in_set)
                 continue
@@ -504,11 +514,13 @@ def util_mirror_danbooru_site_down_image(info_list, image_set_base, image_set_hi
 
 def util_mirror_danbooru_site_html(site_url):
     print "use --skip-highres option to skip highres images"
-#    if "--skip-highres" not in sys.argv:
+#    global g_highres_confirm
+#    if "--skip-highres" not in sys.argv and g_highres_confirm == False:
 #        print "*** --skip-highres not specified in command line!"
 #        print "*** if you are sure you need highres images, press ENTER to continue"
 #        print "*** otherwise, Ctrl-C to quit"
 #        raw_input()
+#        g_highres_confirm = True
     SOCKET_TIMEOUT = 30
     socket.setdefaulttimeout(SOCKET_TIMEOUT)
     tmp_folder = g_tmp_folder
@@ -604,11 +616,13 @@ def util_mirror_danbooru_site_html(site_url):
 
 def util_mirror_danbooru_site(site_url):
     print "use --skip-highres option to skip highres images"
-#    if "--skip-highres" not in sys.argv:
+#    global g_highres_confirm
+#    if "--skip-highres" not in sys.argv and g_highres_confirm == False:
 #        print "*** --skip-highres not specified in command line!"
 #        print "*** if you are sure you need highres images, press ENTER to continue"
 #        print "*** otherwise, Ctrl-C to quit"
 #        raw_input()
+#        g_highres_confirm = True
     SOCKET_TIMEOUT = 30
     socket.setdefaulttimeout(SOCKET_TIMEOUT)
     tmp_folder = g_tmp_folder
@@ -690,11 +704,13 @@ def util_mirror_danbooru_site(site_url):
 # mirror danbooru main site, which only has html access for page >= 1000
 def util_mirror_danbooru_site_ex(site_url, before_id = None):
     print "use --skip-highres option to skip highres images"
-#    if "--skip-highres" not in sys.argv:
+#    global g_highres_confirm
+#    if "--skip-highres" not in sys.argv and g_highres_confirm == False:
 #        print "*** --skip-highres not specified in command line!"
 #        print "*** if you are sure you need highres images, press ENTER to continue"
 #        print "*** otherwise, Ctrl-C to quit"
 #        raw_input()
+#        g_highres_confirm = True
     SOCKET_TIMEOUT = 30
     socket.setdefaulttimeout(SOCKET_TIMEOUT)
     tmp_folder = g_tmp_folder

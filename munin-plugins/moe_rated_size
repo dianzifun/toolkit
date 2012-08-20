@@ -31,7 +31,7 @@ total.draw LINE1
 
 import sqlite3
 
-DB_CONN = sqlite3.connect("/home/santa/moe.sqlite3", 5)
+DB_CONN = sqlite3.connect("/media/Kagami/pictures-new/moe.sqlite3", 5)
 c = DB_CONN.cursor()
 
 total = 0
