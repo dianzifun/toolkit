@@ -2212,6 +2212,41 @@ def util_delete_tag_history_if_necessary(page_src, set_name, id_in_set):
         db_commit()
         c.close()
 
+def util_update_tags_from_sidebar(post_url, set_name, id_in_set):
+    try:
+        print "*** fallback: update from sidebar: %s %d" % (set_name, id_in_set)
+        page_src = "\n".join(map(str.strip, urllib2.urlopen(post_url).readlines()))
+
+        idx = page_src.find('<ul id="tag-sidebar">')
+        idx2 = page_src.find('</ul>', idx)
+        seg_src = page_src[idx:idx2]
+        tags = []
+        idx2 = 0
+        while True:
+            idx = seg_src.find('/post/index', idx2)
+            if idx < 0:
+                break
+            idx2 = seg_src.find('>', idx)
+            idx = seg_src.find('</a>', idx2)
+            tags += seg_src[idx2 + 1:idx],
+            idx2 = idx + 1
+            pass
+
+        print "tags:", tags
+        return False
+
+        db_set_image_tags(set_name, id_in_set, tags)
+        db_set_image_tags(set_name + "_highres", id_in_set, tags)
+
+        c = DB_CONN.cursor()
+        c.execute("delete from tag_history where set_name = '%s' and id_in_set = %d" % (set_name, id_in_set))
+        db_commit()
+        c.close()
+        return True
+    except:
+        traceback.print_exc()
+        time.sleep(1)
+        return False
 
 def util_update_tags_from_page(post_url, set_name, id_in_set):
     try:
@@ -2276,6 +2311,9 @@ def moe_update_tag_history(post_api, set_name):
         for id_in_set in update_list:
             post_url = post_api + str(id_in_set)
             ret = util_update_tags_from_page(post_url, set_name, id_in_set)
+            if ret == False:
+                # second try, from page title
+                ret = util_update_tags_from_sidebar(post_url, set_name, id_in_set)
             if ret == True:
                 n_success += 1
         if n_success > 0:
