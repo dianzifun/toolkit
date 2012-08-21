@@ -2228,7 +2228,9 @@ def util_update_tags_from_sidebar(post_url, set_name, id_in_set):
                 break
             idx2 = seg_src.find('>', idx)
             idx = seg_src.find('</a>', idx2)
-            tags += seg_src[idx2 + 1:idx],
+            t = seg_src[idx2 + 1:idx]
+            t = t.replace(' ', '_')
+            tags += t,
             idx2 = idx + 1
             pass
 
