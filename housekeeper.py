@@ -1250,8 +1250,7 @@ def hk_sys_maint():
     print "  * backup your hard disk by SyncToy"
     print "  * backup your music"
     print
-    print "Press ENTER to continue, or press CTRL+C to quit."
-    raw_input()
+    raw_input("Press ENTER to continue, or press CTRL+C to quit.")
     try:
         print
         print "-" * 80
@@ -1262,8 +1261,8 @@ def hk_sys_maint():
     try:
         print
         print "-" * 80
-        print "phase 2: port selfupdate && port list outdated && port upgrade outdated && port uninstall inactive"
-        hk_exec("port selfupdate && port list outdated && port upgrade outdated && port uninstall inactive")
+        print "phase 2: port selfupdate && port list outdated && port upgrade outdated && port uninstall inactive && port clean --all installed"
+        hk_exec("port selfupdate && port list outdated && port upgrade outdated && port uninstall inactive && port clean --all installed")
     except:
         traceback.print_exc()
     try:
