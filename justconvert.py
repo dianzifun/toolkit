@@ -311,6 +311,9 @@ def jc_ipod_movie_wide(src_fn, dst_fn):
     print "[cmd] %s" % full_cmd
     os.system(full_cmd)
 
+def jc_pdf_gray(src_fn, dst_fn):
+    os.system("gs -sOutputFile=%s -sDEVICE=pdfwrite -sColorConversionStrategy=Gray -dProcessColorModel=/DeviceGray -dCompatibilityLevel=1.4 -dNOPAUSE -dBATCH %s" % (dst_fn, src_fn))
+
 
 def jc_psp_movie(src_fn, dst_fn):
     jc_makedirs(os.path.split(dst_fn)[0])
@@ -503,6 +506,7 @@ usage: justconvert.py <command>
     ipad-movie                    convert a video to ipad movie
     ipod-movie                    convert a video to ipod movie (2nd generation)
     ipod-movie-wide               convert a video to ipod movie (2nd generation, wide screen)
+    pdf-gray                      convert a color PDF into grayscale (GhostScript needed)
     psp-movie                     convert a video to psp format
     psp-movie-dir                 convert video in a folder to psp format
     psp-srt-from-ssa              convert .ssa subtitle into psp .srt format
@@ -551,6 +555,11 @@ if __name__ == "__main__":
             print "<dst_file> should have .mp4 as extension"
             exit(0)
         jc_ipod_movie_wide(sys.argv[2], sys.argv[3])
+    elif sys.argv[1] == "pdf-gray":
+        if len(sys.argv) < 4:
+            print "usage: justconvert.py pdf-gray <src_file> <dst_file>"
+            exit(0)
+        jc_pdf_gray(sys.argv[2], sys.argv[3])
     elif sys.argv[1] == "psp-movie":
         if len(sys.argv) < 4:
             print "usage: justconvert.py psp-movie <src_file> <dst_file>"
