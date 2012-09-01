@@ -381,8 +381,8 @@ def mang_download_manhua178(manga_url, **opt):
             if idx < 0:
                 # second fall back
                 raise Exception("'var pages' not found!")
-            idx += 13
-            idx2 = chap_src.find("\r\n", idx) - 2
+            idx = chap_src.find('[', idx)
+            idx2 = chap_src.find("]", idx) + 1
             comic_pages_src = chap_src[idx:idx2].replace("\\/", "/")
             comic_pages_url = eval(comic_pages_src)
 
@@ -1085,8 +1085,8 @@ def mg_check_178(dpath):
             if idx < 0:
                 # second fall back
                 raise Exception("'var pages' not found!")
-            idx += 13
-            idx2 = chap_src.find("\r\n", idx) - 2
+            idx = chap_src.find('[', idx)
+            idx2 = chap_src.find("]", idx) + 1
             comic_pages_src = chap_src[idx:idx2].replace("\\/", "/")
             comic_pages_url = eval(comic_pages_src)
 
